@@ -1648,7 +1648,8 @@
           'Day Assignment overhauled: pick each day\'s workout independently. Picking a workout from another day frees that day. The dropdown shows the floating workout in orange so you know which one fills a missing day.',
           'New orange CONFIRM button locks Day Assignment changes in. You can\'t leave DATA + SETNG until every day has a workout and CONFIRM is pressed.',
           'INFO tab condensed: tutorial topics now live in a single dropdown card, plus this Change Log.',
-          '"Danger Zone" renamed to DATA WIPE.'
+          '"Danger Zone" renamed to DATA WIPE.',
+          'Deleting an exercise now also clears its hidden saved data so your export stays small over time.'
         ]
       }
     ];
@@ -2142,6 +2143,13 @@
         );
         if (ok) {
           state.workouts[state.currentDay].exercises = state.workouts[state.currentDay].exercises.filter(x => x.id !== exerciseId);
+          // Clean up orphaned exercise data if no other workout still references this id
+          const stillReferenced = Object.values(state.workouts).some(w =>
+            Array.isArray(w.exercises) && w.exercises.some(x => x.id === exerciseId)
+          );
+          if (!stillReferenced) {
+            delete state.exerciseData[exerciseId];
+          }
           saveState();
           renderContent();
           showToast('Deleted');
