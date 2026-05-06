@@ -1,2 +1,2 @@
-# LiftLog
-LiftLog repo
+# SPLITSTAK
+SPLITSTAK repo
