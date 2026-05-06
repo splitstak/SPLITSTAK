@@ -91,8 +91,14 @@
     background: var(--bg);
     position: sticky;
     top: 87px;
-    z-index: 99;
+    z-index: 90;
     border-bottom: 1px solid var(--border);
+    transition: transform 0.22s ease-out;
+    will-change: transform;
+  }
+
+  .top-tabs.tabs-hidden {
+    transform: translateY(-110%);
   }
 
   .top-tabs-main {
@@ -1137,10 +1143,11 @@
     <p>If you clear your browser data, switch devices, or uninstall this app, <strong>everything is gone.</strong> There is no cloud backup. There is no account.</p>
     <p style="color: var(--text);"><strong>What you must do:</strong></p>
     <ul style="font-size: 13px; color: var(--text-dim); padding-left: 20px; margin-bottom: 12px; line-height: 1.6;">
-      <li>Visit the DATA tab regularly</li>
-      <li>Hit EXPORT and save the text somewhere safe (Notes app, email, anywhere)</li>
+      <li>Visit DATA + SETNG → BACKUP & RESTORE regularly</li>
+      <li>Hit EXPORT — it downloads a CSV file with all your data</li>
+      <li>Save that CSV somewhere off this device (cloud storage, email it to yourself, anywhere)</li>
       <li>Do this at least once a week</li>
-      <li>If you ever lose your data, IMPORT brings it back</li>
+      <li>If you lose your data, IMPORT the CSV brings everything back</li>
     </ul>
     <div class="ack-checkbox">
       <input type="checkbox" id="ackCheck">
@@ -1660,7 +1667,11 @@
           'New "FOR BEGINNERS" card on the INFO tab — the default split is followable as-is for newcomers.',
           'Day names are now spelled out in full (TUESDAY instead of TUE) on the day tab, the day-view dropdown, and the DAY ASSIGNMENT rows.',
           'The day tab text is a bit larger now so it reads as the dominant nav element.',
-          'Cleaned up the active rest day subtitle — it now just reads "Light Cardio".'
+          'Cleaned up the active rest day subtitle — it now just reads "Light Cardio".',
+          'Picking "Custom..." on an unassigned day now creates a new workout with your typed name and slots it into that day.',
+          'Once every weekday has a workout, the orange "pick this" highlight goes away — no visual noise once everything is settled.',
+          'The top tabs now slide up out of the way when you scroll down through a workout, and slide back when you scroll up. The SPLITSTAK header stays put.',
+          'Updated all data-warning copy across the app to mention the CSV file flow specifically — Export downloads a CSV, Import accepts a CSV.'
         ]
       },
       {
@@ -1688,7 +1699,7 @@
       <div class="info-section warning">
         <h3>⚠ DATA WARNING</h3>
         <p><strong>Your data is stored only in this browser.</strong> Clearing browser data, switching devices, or uninstalling = total loss.</p>
-        <p>Visit the DATA + SETNG tab and EXPORT regularly. There is no cloud, no account, no automatic backup.</p>
+        <p>Visit DATA + SETNG → BACKUP & RESTORE and hit EXPORT regularly. It downloads a CSV file — save it to cloud storage or email it to yourself. Use IMPORT to restore from that CSV later. There is no cloud sync, no account, no automatic backup.</p>
       </div>
 
       <div class="info-section">
@@ -1768,9 +1779,12 @@
     const validAssignment = isDayAssignmentValid(assignment);
 
     // Workouts that aren't currently sitting on any day in the pending state.
-    // These are the "culprits" — picking one of them resolves a missing-day conflict.
+    // Only highlighted when at least one day is unassigned — once everything's filled, no need to draw attention.
     const assignedKeys = new Set(Object.values(assignment).filter(Boolean));
-    const floatingKeys = new Set(workoutEntries.map(([k]) => k).filter(k => !assignedKeys.has(k)));
+    const hasUnassignedDay = Object.values(assignment).some(v => !v);
+    const floatingKeys = hasUnassignedDay
+      ? new Set(workoutEntries.map(([k]) => k).filter(k => !assignedKeys.has(k)))
+      : new Set();
 
     const dayRowsHtml = weekOrder.map(d => {
       const currentKey = assignment[d];
@@ -1839,7 +1853,7 @@
         <h3>⚠ READ THIS</h3>
         <p style="color: var(--text);"><strong>Everything you see in this app — workouts, history, customizations — lives only on this device, in this browser.</strong></p>
         <p>If you clear browser data, switch phones, or your phone gets wiped, it's gone unless you've exported.</p>
-        <p style="color: var(--text);"><strong>Export at least weekly.</strong> Save the text in your Notes app, email it to yourself, or paste it into Google Drive.</p>
+        <p style="color: var(--text);"><strong>Export at least weekly.</strong> The EXPORT button below downloads a CSV file with all your data. Save it somewhere off this device — cloud storage, email, AirDrop, anywhere. Use IMPORT to restore from a CSV file.</p>
       </div>
 
       <div class="data-section">
@@ -1888,7 +1902,19 @@
           const pendingNow = pendingDayAssignment || getCurrentDayAssignment();
           const currentKey = pendingNow[targetDay];
           if (!currentKey) {
-            await customAlert('Pick a workout for this day first, then choose Custom to rename it.', 'NO WORKOUT YET');
+            // Day is unassigned — Custom creates a new workout and slots it in.
+            const newName = await customPrompt('Type a name for the new workout (e.g., CHEST/TRI).', 'NEW CUSTOM WORKOUT', '');
+            if (newName) {
+              const newKey = 'custom_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+              state.workouts[newKey] = {
+                name: newName,
+                subtitle: '',
+                day: '',
+                exercises: []
+              };
+              saveState();
+              applyPendingDayChange(targetDay, newKey);
+            }
             renderContent();
             return;
           }
@@ -3032,6 +3058,34 @@
       renderContent();
       setTimeout(showAck, 300);
     }
+
+    setupScrollHidableTabs();
+  }
+
+  // Top tabs slide up behind the SPLITSTAK header when scrolling down, slide back when scrolling up.
+  function setupScrollHidableTabs() {
+    const tabs = document.getElementById('topTabs');
+    if (!tabs) return;
+    let lastY = window.scrollY;
+    let ticking = false;
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        const y = window.scrollY;
+        const dy = y - lastY;
+        if (y < 40) {
+          tabs.classList.remove('tabs-hidden');
+        } else if (dy > 4) {
+          tabs.classList.add('tabs-hidden');
+        } else if (dy < -4) {
+          tabs.classList.remove('tabs-hidden');
+        }
+        lastY = y;
+        ticking = false;
+      });
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
   }
 
   init();
