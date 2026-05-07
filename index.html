@@ -246,6 +246,9 @@
     padding: 2px 4px;
     margin-left: -4px;
     border-radius: 2px;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
   }
 
   .exercise-name:hover {
@@ -255,6 +258,7 @@
   .exercise-name.editing {
     background: var(--bg);
     outline: 1px solid var(--accent);
+    position: relative;
   }
 
   .exercise-target {
@@ -267,6 +271,9 @@
     margin-left: -4px;
     border-radius: 2px;
     display: inline-block;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
   }
 
   .exercise-target:hover {
@@ -277,6 +284,7 @@
     background: var(--bg);
     outline: 1px solid var(--accent);
     color: var(--text);
+    position: relative;
   }
 
   /* Inline edit input mimics the look of the surrounding text */
@@ -359,6 +367,14 @@
   }
 
   .exercise.expanded .sets { display: block; }
+
+  /* Time-only and bodyweight-only modes drop the second value column. */
+  .sets.sets-time .sets-header,
+  .sets.sets-time .set-row,
+  .sets.sets-bodyweight .sets-header,
+  .sets.sets-bodyweight .set-row {
+    grid-template-columns: 40px 1fr 50px;
+  }
 
   .sets-header {
     display: grid;
@@ -1242,8 +1258,8 @@
       day: 'SAT',
       exercises: [
         { id: 'cable_crunch', name: 'Cable Crunch', target: '3 × 12–15' },
-        { id: 'knee_raise', name: 'Hanging Knee Raise', target: '3 × 10–15' },
-        { id: 'plank', name: 'Plank (seconds)', target: '3 × 30–60s' },
+        { id: 'knee_raise', name: 'Hanging Knee Raise', target: '3 × 10–15', mode: 'bodyweight' },
+        { id: 'plank', name: 'Plank', target: '3 × 30–60s', mode: 'time' },
         { id: 'cardio_abs', name: 'Cardio', target: '', isCardio: true }
       ]
     },
@@ -1263,93 +1279,257 @@
     '60–90 sec rest between sets. Use a timer.',
     'Diet drives fat loss. Lifting preserves muscle.',
     'Session over 60 min? You\'re doing too much.',
-    'Tap any exercise name or target text to edit it directly.',
+    'Long-press any exercise name or target text to edit it directly.',
     'Use the Save Day button to commit all your sets to history.',
     'Re-saving the same day overwrites that day\'s history entry.'
   ];
 
   // ============ AUTOCOMPLETE LIBRARY ============
   // Common lifts with suggested rep ranges. Used when typing in exercise name field.
+  // mode controls how the exercise's set rows render:
+  //   'reps'       — weight + reps + done (default; the standard lift)
+  //   'time'       — seconds + done (planks, dead hangs, holds, carries timed by clock)
+  //   'bodyweight' — reps + done (push-ups, pull-ups, hanging leg raises — no load tracked)
+  //   'cardio'     — single time + distance pair (treadmill, bike, etc.)
+  // tags carry muscle groups + aliases. Smart matching searches both name AND tags so
+  // typing "tricep" surfaces Skull Crushers, Pushdowns, Close-Grip Bench, etc.
   const EXERCISE_LIBRARY = [
-    { name: 'Smith Machine Bench Press', target: '3 × 6–8' },
-    { name: 'Barbell Bench Press', target: '3 × 6–8' },
-    { name: 'Dumbbell Bench Press', target: '3 × 8–10' },
-    { name: 'Incline Bench Press', target: '3 × 8–10' },
-    { name: 'Incline Dumbbell Press', target: '3 × 8–10' },
-    { name: 'Decline Bench Press', target: '3 × 8–10' },
-    { name: 'Cable Chest Fly', target: '3 × 10–12' },
-    { name: 'Pec Deck', target: '3 × 10–12' },
-    { name: 'Push-Up', target: '3 × AMRAP' },
-    { name: 'Dips', target: '3 × 8–12' },
-    { name: 'Smith Machine Shoulder Press', target: '3 × 8–10' },
-    { name: 'Overhead Press', target: '3 × 6–8' },
-    { name: 'Dumbbell Shoulder Press', target: '3 × 8–10' },
-    { name: 'Cable Lateral Raise', target: '3 × 10–12' },
-    { name: 'Dumbbell Lateral Raise', target: '3 × 10–12' },
-    { name: 'Front Raise', target: '3 × 10–12' },
-    { name: 'Rear Delt Fly', target: '3 × 12–15' },
-    { name: 'Face Pull', target: '3 × 12–15' },
-    { name: 'Shrugs', target: '3 × 10–12' },
-    { name: 'Tricep Pushdown', target: '3 × 8–10' },
-    { name: 'Tricep Extension', target: '3 × 10–12' },
-    { name: 'Skull Crusher', target: '3 × 8–10' },
-    { name: 'Close-Grip Bench Press', target: '3 × 6–8' },
-    { name: 'Overhead Tricep Extension', target: '3 × 10–12' },
-    { name: 'Lat Pulldown', target: '3 × 6–8' },
-    { name: 'Pull-Up', target: '3 × AMRAP' },
-    { name: 'Chin-Up', target: '3 × AMRAP' },
-    { name: 'Seated Cable Row', target: '3 × 8–10' },
-    { name: 'Smith Machine Bent-Over Row', target: '3 × 8–10' },
-    { name: 'Barbell Row', target: '3 × 6–8' },
-    { name: 'Dumbbell Row', target: '3 × 8–10' },
-    { name: 'T-Bar Row', target: '3 × 8–10' },
-    { name: 'Chest-Supported Row', target: '3 × 8–10' },
-    { name: 'Straight-Arm Pulldown', target: '3 × 10–12' },
-    { name: 'Bicep Curl', target: '3 × 8–10' },
-    { name: 'EZ Bar Curl', target: '3 × 8–10' },
-    { name: 'Barbell Curl', target: '3 × 8–10' },
-    { name: 'Dumbbell Curl', target: '3 × 8–10' },
-    { name: 'Hammer Curl', target: '3 × 10–12' },
-    { name: 'Preacher Curl', target: '3 × 10–12' },
-    { name: 'Cable Curl', target: '3 × 10–12' },
-    { name: 'Concentration Curl', target: '3 × 10–12' },
-    { name: 'Smith Machine Squat', target: '3 × 6–8' },
-    { name: 'Barbell Squat', target: '3 × 5–8' },
-    { name: 'Front Squat', target: '3 × 5–8' },
-    { name: 'Goblet Squat', target: '3 × 8–10' },
-    { name: 'Hack Squat', target: '3 × 8–10' },
-    { name: 'Leg Press', target: '3 × 8–10' },
-    { name: 'Romanian Deadlift', target: '3 × 8–10' },
-    { name: 'Conventional Deadlift', target: '3 × 5' },
-    { name: 'Sumo Deadlift', target: '3 × 5' },
-    { name: 'Stiff-Leg Deadlift', target: '3 × 8–10' },
-    { name: 'Bulgarian Split Squat', target: '3 × 8–10' },
-    { name: 'Walking Lunge', target: '3 × 10–12 ea' },
-    { name: 'Reverse Lunge', target: '3 × 8–10 ea' },
-    { name: 'Leg Extension', target: '3 × 10–12' },
-    { name: 'Hamstring Curl', target: '3 × 10–12' },
-    { name: 'Seated Leg Curl', target: '3 × 10–12' },
-    { name: 'Calf Raises', target: '3 × 12–15' },
-    { name: 'Seated Calf Raise', target: '3 × 12–15' },
-    { name: 'Standing Calf Raise', target: '3 × 12–15' },
-    { name: 'Hip Thrust', target: '3 × 8–10' },
-    { name: 'Glute Bridge', target: '3 × 10–12' },
-    { name: 'Hip Abduction', target: '3 × 12–15' },
-    { name: 'Hip Adduction', target: '3 × 12–15' },
-    { name: 'Cable Crunch', target: '3 × 12–15' },
-    { name: 'Crunches', target: '3 × 15–20' },
-    { name: 'Sit-Up', target: '3 × 15–20' },
-    { name: 'Hanging Knee Raise', target: '3 × 10–15' },
-    { name: 'Hanging Leg Raise', target: '3 × 8–12' },
-    { name: 'Lying Leg Raise', target: '3 × 12–15' },
-    { name: 'Plank', target: '3 × 30–60s' },
-    { name: 'Side Plank', target: '3 × 30–45s ea' },
-    { name: 'Russian Twist', target: '3 × 15–20' },
-    { name: 'Wood Chopper', target: '3 × 10–12 ea' },
-    { name: 'Ab Wheel Rollout', target: '3 × 8–12' },
-    { name: 'Wrist Curl', target: '3 × 12–15' },
-    { name: 'Reverse Wrist Curl', target: '3 × 12–15' },
-    { name: 'Farmer\'s Walk', target: '3 × 30–60s' }
+    // ===== CHEST: barbell / dumbbell / Smith presses =====
+    { name: 'Barbell Bench Press', target: '3 × 6–8', mode: 'reps', tags: ['chest','push','pec','flat','barbell','compound'] },
+    { name: 'Smith Machine Bench Press', target: '3 × 6–8', mode: 'reps', tags: ['chest','push','pec','flat','smith','compound'] },
+    { name: 'Dumbbell Bench Press', target: '3 × 8–10', mode: 'reps', tags: ['chest','push','pec','flat','dumbbell','db bench'] },
+    { name: 'Incline Barbell Bench Press', target: '3 × 6–8', mode: 'reps', tags: ['chest','push','pec','incline','upper chest','barbell'] },
+    { name: 'Incline Smith Machine Press', target: '3 × 8–10', mode: 'reps', tags: ['chest','push','pec','incline','upper chest','smith'] },
+    { name: 'Incline Dumbbell Press', target: '3 × 8–10', mode: 'reps', tags: ['chest','push','pec','incline','upper chest','dumbbell','db incline'] },
+    { name: 'Decline Barbell Bench Press', target: '3 × 6–8', mode: 'reps', tags: ['chest','push','pec','decline','lower chest','barbell'] },
+    { name: 'Decline Dumbbell Press', target: '3 × 8–10', mode: 'reps', tags: ['chest','push','pec','decline','dumbbell'] },
+    { name: 'Decline Smith Machine Press', target: '3 × 8–10', mode: 'reps', tags: ['chest','push','pec','decline','smith'] },
+    { name: 'Close-Grip Bench Press', target: '3 × 6–8', mode: 'reps', tags: ['triceps','tricep','arms','chest','push','barbell'] },
+    { name: 'Floor Press', target: '3 × 6–8', mode: 'reps', tags: ['chest','triceps','tricep','push','barbell'] },
+    { name: 'Spoto Press', target: '3 × 6–8', mode: 'reps', tags: ['chest','push','barbell','paused'] },
+    { name: 'Paused Bench Press', target: '3 × 6–8', mode: 'reps', tags: ['chest','push','barbell','paused'] },
+    { name: 'Board Press', target: '3 × 5–8', mode: 'reps', tags: ['chest','triceps','tricep','push','barbell'] },
+    { name: 'Larsen Press', target: '3 × 6–8', mode: 'reps', tags: ['chest','push','barbell'] },
+    { name: 'Single-Arm Dumbbell Bench Press', target: '3 × 8–10 ea', mode: 'reps', tags: ['chest','push','pec','dumbbell','unilateral','core'] },
+    // ===== CHEST: flyes =====
+    { name: 'Dumbbell Fly', target: '3 × 10–12', mode: 'reps', tags: ['chest','pec','flye','isolation','dumbbell'] },
+    { name: 'Incline Dumbbell Fly', target: '3 × 10–12', mode: 'reps', tags: ['chest','pec','flye','incline','upper chest','dumbbell'] },
+    { name: 'Cable Chest Fly', target: '3 × 10–12', mode: 'reps', tags: ['chest','pec','flye','isolation','cable'] },
+    { name: 'Cable Crossover', target: '3 × 10–12', mode: 'reps', tags: ['chest','pec','flye','cable'] },
+    { name: 'Low-to-High Cable Fly', target: '3 × 10–12', mode: 'reps', tags: ['chest','pec','flye','upper chest','cable'] },
+    { name: 'High-to-Low Cable Fly', target: '3 × 10–12', mode: 'reps', tags: ['chest','pec','flye','lower chest','cable'] },
+    { name: 'Pec Deck', target: '3 × 10–12', mode: 'reps', tags: ['chest','pec','flye','isolation','machine'] },
+    { name: 'Svend Press', target: '3 × 10–12', mode: 'reps', tags: ['chest','pec','inner chest','plate'] },
+    // ===== CHEST: push-ups & dips =====
+    { name: 'Push-Up', target: '3 × AMRAP', mode: 'bodyweight', tags: ['chest','push','pec','triceps','tricep','bodyweight','pushup'] },
+    { name: 'Diamond Push-Up', target: '3 × AMRAP', mode: 'bodyweight', tags: ['triceps','tricep','arms','chest','push','bodyweight'] },
+    { name: 'Decline Push-Up', target: '3 × AMRAP', mode: 'bodyweight', tags: ['chest','push','upper chest','bodyweight'] },
+    { name: 'Incline Push-Up', target: '3 × AMRAP', mode: 'bodyweight', tags: ['chest','push','lower chest','bodyweight'] },
+    { name: 'Wide-Grip Push-Up', target: '3 × AMRAP', mode: 'bodyweight', tags: ['chest','push','pec','bodyweight'] },
+    { name: 'Archer Push-Up', target: '3 × 6–8 ea', mode: 'bodyweight', tags: ['chest','push','unilateral','bodyweight'] },
+    { name: 'Weighted Push-Up', target: '3 × 8–12', mode: 'reps', tags: ['chest','push','pec'] },
+    { name: 'Dips', target: '3 × 8–12', mode: 'bodyweight', tags: ['chest','triceps','tricep','arms','push','bodyweight'] },
+    { name: 'Bench Dips', target: '3 × 12–15', mode: 'bodyweight', tags: ['triceps','tricep','arms','push','bodyweight'] },
+    { name: 'Ring Dips', target: '3 × 6–10', mode: 'bodyweight', tags: ['chest','triceps','tricep','push','bodyweight','rings'] },
+    { name: 'Weighted Dips', target: '3 × 6–10', mode: 'reps', tags: ['chest','triceps','tricep','arms','push'] },
+
+    // ===== SHOULDERS: pressing =====
+    { name: 'Overhead Press', target: '3 × 6–8', mode: 'reps', tags: ['shoulders','delts','push','barbell','compound','ohp','military press'] },
+    { name: 'Standing Overhead Press', target: '3 × 6–8', mode: 'reps', tags: ['shoulders','delts','push','barbell','ohp','military'] },
+    { name: 'Seated Barbell Overhead Press', target: '3 × 6–8', mode: 'reps', tags: ['shoulders','delts','push','barbell'] },
+    { name: 'Smith Machine Shoulder Press', target: '3 × 8–10', mode: 'reps', tags: ['shoulders','delts','push','smith'] },
+    { name: 'Dumbbell Shoulder Press', target: '3 × 8–10', mode: 'reps', tags: ['shoulders','delts','push','dumbbell'] },
+    { name: 'Seated Dumbbell Press', target: '3 × 8–10', mode: 'reps', tags: ['shoulders','delts','push','dumbbell'] },
+    { name: 'Single-Arm Dumbbell Press', target: '3 × 8–10 ea', mode: 'reps', tags: ['shoulders','delts','push','dumbbell','unilateral'] },
+    { name: 'Arnold Press', target: '3 × 8–10', mode: 'reps', tags: ['shoulders','delts','push','dumbbell'] },
+    { name: 'Push Press', target: '3 × 5', mode: 'reps', tags: ['shoulders','delts','push','barbell','power','compound'] },
+    { name: 'Z Press', target: '3 × 6–8', mode: 'reps', tags: ['shoulders','core','push','barbell','dumbbell'] },
+    { name: 'Landmine Press', target: '3 × 8–10 ea', mode: 'reps', tags: ['shoulders','chest','push','landmine','unilateral'] },
+    // ===== SHOULDERS: lateral / front / rear =====
+    { name: 'Dumbbell Lateral Raise', target: '3 × 10–12', mode: 'reps', tags: ['shoulders','delts','side delts','lateral','isolation','dumbbell'] },
+    { name: 'Cable Lateral Raise', target: '3 × 10–12 ea', mode: 'reps', tags: ['shoulders','delts','side delts','lateral','cable','unilateral'] },
+    { name: 'Machine Lateral Raise', target: '3 × 10–12', mode: 'reps', tags: ['shoulders','delts','side delts','lateral','machine'] },
+    { name: 'Leaning Lateral Raise', target: '3 × 10–12 ea', mode: 'reps', tags: ['shoulders','delts','lateral','cable','dumbbell','unilateral'] },
+    { name: 'Egyptian Lateral Raise', target: '3 × 10–12 ea', mode: 'reps', tags: ['shoulders','delts','lateral','cable','unilateral'] },
+    { name: 'Dumbbell Front Raise', target: '3 × 10–12', mode: 'reps', tags: ['shoulders','delts','front delts','dumbbell'] },
+    { name: 'Barbell Front Raise', target: '3 × 10–12', mode: 'reps', tags: ['shoulders','delts','front delts','barbell'] },
+    { name: 'Plate Front Raise', target: '3 × 10–12', mode: 'reps', tags: ['shoulders','delts','front delts','plate'] },
+    { name: 'Cable Front Raise', target: '3 × 10–12', mode: 'reps', tags: ['shoulders','delts','front delts','cable'] },
+    { name: 'Rear Delt Fly', target: '3 × 12–15', mode: 'reps', tags: ['shoulders','rear delts','back','reverse fly','dumbbell'] },
+    { name: 'Reverse Pec Deck', target: '3 × 12–15', mode: 'reps', tags: ['shoulders','rear delts','reverse fly','machine'] },
+    { name: 'Cable Rear Delt Fly', target: '3 × 12–15', mode: 'reps', tags: ['shoulders','rear delts','reverse fly','cable'] },
+    { name: 'Bent-Over Reverse Fly', target: '3 × 12–15', mode: 'reps', tags: ['shoulders','rear delts','reverse fly','dumbbell'] },
+    { name: 'Face Pull', target: '3 × 12–15', mode: 'reps', tags: ['shoulders','rear delts','upper back','rotator cuff','cable'] },
+    // ===== SHOULDERS: upright row / shrugs =====
+    { name: 'Barbell Upright Row', target: '3 × 10–12', mode: 'reps', tags: ['shoulders','traps','pull','barbell'] },
+    { name: 'Dumbbell Upright Row', target: '3 × 10–12', mode: 'reps', tags: ['shoulders','traps','pull','dumbbell'] },
+    { name: 'Cable Upright Row', target: '3 × 10–12', mode: 'reps', tags: ['shoulders','traps','pull','cable'] },
+    { name: 'Barbell Shrug', target: '3 × 10–12', mode: 'reps', tags: ['traps','shoulders','barbell','shrugs'] },
+    { name: 'Dumbbell Shrug', target: '3 × 10–12', mode: 'reps', tags: ['traps','shoulders','dumbbell','shrugs'] },
+    { name: 'Smith Machine Shrug', target: '3 × 10–12', mode: 'reps', tags: ['traps','shoulders','smith','shrugs'] },
+    { name: 'Trap Bar Shrug', target: '3 × 10–12', mode: 'reps', tags: ['traps','shoulders','trap bar','shrugs'] },
+
+    // ===== BACK / LATS: vertical pulls =====
+    { name: 'Pull-Up', target: '3 × AMRAP', mode: 'bodyweight', tags: ['back','lats','pull','biceps','bodyweight','pullup'] },
+    { name: 'Chin-Up', target: '3 × AMRAP', mode: 'bodyweight', tags: ['back','lats','biceps','arms','pull','bodyweight','chinup'] },
+    { name: 'Neutral-Grip Pull-Up', target: '3 × AMRAP', mode: 'bodyweight', tags: ['back','lats','pull','biceps','bodyweight'] },
+    { name: 'Wide-Grip Pull-Up', target: '3 × 6–10', mode: 'bodyweight', tags: ['back','lats','pull','bodyweight'] },
+    { name: 'Weighted Pull-Up', target: '3 × 6–8', mode: 'reps', tags: ['back','lats','pull','biceps'] },
+    { name: 'Lat Pulldown', target: '3 × 8–10', mode: 'reps', tags: ['back','lats','pull','cable'] },
+    { name: 'Wide-Grip Lat Pulldown', target: '3 × 8–10', mode: 'reps', tags: ['back','lats','pull','cable'] },
+    { name: 'Close-Grip Lat Pulldown', target: '3 × 8–10', mode: 'reps', tags: ['back','lats','biceps','pull','cable'] },
+    { name: 'Reverse-Grip Lat Pulldown', target: '3 × 8–10', mode: 'reps', tags: ['back','lats','biceps','pull','cable'] },
+    { name: 'Single-Arm Lat Pulldown', target: '3 × 8–10 ea', mode: 'reps', tags: ['back','lats','pull','cable','unilateral'] },
+    { name: 'Straight-Arm Pulldown', target: '3 × 10–12', mode: 'reps', tags: ['back','lats','isolation','cable'] },
+    // ===== BACK: rows =====
+    { name: 'Barbell Row', target: '3 × 6–8', mode: 'reps', tags: ['back','lats','pull','barbell','compound','bent over row'] },
+    { name: 'Pendlay Row', target: '3 × 5', mode: 'reps', tags: ['back','lats','pull','barbell','power'] },
+    { name: 'Yates Row', target: '3 × 6–8', mode: 'reps', tags: ['back','lats','biceps','pull','barbell'] },
+    { name: 'Smith Machine Bent-Over Row', target: '3 × 8–10', mode: 'reps', tags: ['back','lats','pull','smith'] },
+    { name: 'Dumbbell Row', target: '3 × 8–10 ea', mode: 'reps', tags: ['back','lats','pull','dumbbell','unilateral','one arm row'] },
+    { name: 'Chest-Supported Dumbbell Row', target: '3 × 8–10', mode: 'reps', tags: ['back','lats','rear delts','pull','dumbbell'] },
+    { name: 'Seal Row', target: '3 × 8–10', mode: 'reps', tags: ['back','lats','pull','barbell','dumbbell'] },
+    { name: 'Meadows Row', target: '3 × 8–10 ea', mode: 'reps', tags: ['back','lats','pull','landmine','unilateral'] },
+    { name: 'Kroc Row', target: '3 × 15–20 ea', mode: 'reps', tags: ['back','lats','pull','dumbbell','unilateral'] },
+    { name: 'T-Bar Row', target: '3 × 8–10', mode: 'reps', tags: ['back','lats','pull','tbar'] },
+    { name: 'Landmine Row', target: '3 × 8–10', mode: 'reps', tags: ['back','lats','pull','landmine'] },
+    { name: 'Seated Cable Row', target: '3 × 8–10', mode: 'reps', tags: ['back','lats','pull','cable'] },
+    { name: 'Wide-Grip Cable Row', target: '3 × 10–12', mode: 'reps', tags: ['back','rear delts','pull','cable'] },
+    { name: 'Single-Arm Cable Row', target: '3 × 10–12 ea', mode: 'reps', tags: ['back','lats','pull','cable','unilateral'] },
+    { name: 'Inverted Row', target: '3 × AMRAP', mode: 'bodyweight', tags: ['back','lats','pull','bodyweight'] },
+    // ===== BACK: deadlifts & posterior chain =====
+    { name: 'Conventional Deadlift', target: '3 × 5', mode: 'reps', tags: ['back','hamstrings','glutes','hinge','barbell','compound','deadlift'] },
+    { name: 'Sumo Deadlift', target: '3 × 5', mode: 'reps', tags: ['glutes','quads','back','hinge','barbell','compound','deadlift'] },
+    { name: 'Romanian Deadlift', target: '3 × 8–10', mode: 'reps', tags: ['hamstrings','glutes','hinge','barbell','rdl'] },
+    { name: 'Stiff-Leg Deadlift', target: '3 × 8–10', mode: 'reps', tags: ['hamstrings','glutes','hinge','barbell'] },
+    { name: 'Trap Bar Deadlift', target: '3 × 5', mode: 'reps', tags: ['back','glutes','quads','hinge','trap bar','compound','deadlift'] },
+    { name: 'Snatch-Grip Deadlift', target: '3 × 5–6', mode: 'reps', tags: ['back','lats','hamstrings','hinge','barbell'] },
+    { name: 'Deficit Deadlift', target: '3 × 4–6', mode: 'reps', tags: ['back','hamstrings','glutes','hinge','barbell'] },
+    { name: 'Rack Pull', target: '3 × 5', mode: 'reps', tags: ['back','traps','lockout','barbell'] },
+    { name: 'Single-Leg Romanian Deadlift', target: '3 × 8–10 ea', mode: 'reps', tags: ['hamstrings','glutes','balance','dumbbell','unilateral','rdl'] },
+    { name: 'Dumbbell Romanian Deadlift', target: '3 × 8–10', mode: 'reps', tags: ['hamstrings','glutes','hinge','dumbbell','rdl'] },
+    { name: 'Good Morning', target: '3 × 8–10', mode: 'reps', tags: ['hamstrings','glutes','lower back','hinge','barbell'] },
+    { name: 'Back Extension', target: '3 × 10–12', mode: 'bodyweight', tags: ['lower back','glutes','hamstrings','hyperextension','bodyweight'] },
+    { name: 'Reverse Hyperextension', target: '3 × 12–15', mode: 'reps', tags: ['glutes','lower back','hamstrings'] },
+
+    // ===== BICEPS =====
+    { name: 'Barbell Curl', target: '3 × 8–10', mode: 'reps', tags: ['biceps','bicep','arms','barbell'] },
+    { name: 'EZ Bar Curl', target: '3 × 8–10', mode: 'reps', tags: ['biceps','bicep','arms','ezbar','ez curl'] },
+    { name: 'Dumbbell Curl', target: '3 × 8–10', mode: 'reps', tags: ['biceps','bicep','arms','dumbbell'] },
+    { name: 'Alternating Dumbbell Curl', target: '3 × 8–10 ea', mode: 'reps', tags: ['biceps','bicep','arms','dumbbell','unilateral'] },
+    { name: 'Hammer Curl', target: '3 × 10–12', mode: 'reps', tags: ['biceps','bicep','forearms','arms','dumbbell','brachialis'] },
+    { name: 'Cross-Body Hammer Curl', target: '3 × 10–12 ea', mode: 'reps', tags: ['biceps','bicep','forearms','dumbbell','unilateral'] },
+    { name: 'Preacher Curl', target: '3 × 10–12', mode: 'reps', tags: ['biceps','bicep','arms','preacher','isolation'] },
+    { name: 'Dumbbell Preacher Curl', target: '3 × 10–12 ea', mode: 'reps', tags: ['biceps','bicep','arms','dumbbell','preacher','unilateral'] },
+    { name: 'Concentration Curl', target: '3 × 10–12 ea', mode: 'reps', tags: ['biceps','bicep','arms','dumbbell','isolation','unilateral'] },
+    { name: 'Incline Dumbbell Curl', target: '3 × 10–12', mode: 'reps', tags: ['biceps','bicep','arms','dumbbell','incline','long head'] },
+    { name: 'Spider Curl', target: '3 × 10–12', mode: 'reps', tags: ['biceps','bicep','arms','isolation','short head'] },
+    { name: 'Cable Curl', target: '3 × 10–12', mode: 'reps', tags: ['biceps','bicep','arms','cable'] },
+    { name: 'Cable Hammer Curl', target: '3 × 10–12', mode: 'reps', tags: ['biceps','bicep','forearms','arms','cable','rope'] },
+    { name: 'Drag Curl', target: '3 × 10–12', mode: 'reps', tags: ['biceps','bicep','arms','barbell'] },
+    { name: 'Zottman Curl', target: '3 × 10–12', mode: 'reps', tags: ['biceps','bicep','forearms','arms','dumbbell'] },
+    { name: 'Reverse Curl', target: '3 × 10–12', mode: 'reps', tags: ['forearms','biceps','bicep','brachialis','barbell','ezbar'] },
+    { name: 'Bayesian Curl', target: '3 × 10–12 ea', mode: 'reps', tags: ['biceps','bicep','arms','cable','unilateral','long head'] },
+
+    // ===== TRICEPS =====
+    { name: 'Skull Crusher', target: '3 × 8–10', mode: 'reps', tags: ['triceps','tricep','arms','ezbar','barbell','lying tricep extension','skullcrusher'] },
+    { name: 'Dumbbell Skull Crusher', target: '3 × 10–12', mode: 'reps', tags: ['triceps','tricep','arms','dumbbell','lying tricep extension'] },
+    { name: 'Tricep Pushdown', target: '3 × 10–12', mode: 'reps', tags: ['triceps','tricep','arms','cable'] },
+    { name: 'Rope Tricep Pushdown', target: '3 × 10–12', mode: 'reps', tags: ['triceps','tricep','arms','cable','rope'] },
+    { name: 'V-Bar Tricep Pushdown', target: '3 × 10–12', mode: 'reps', tags: ['triceps','tricep','arms','cable'] },
+    { name: 'Reverse-Grip Tricep Pushdown', target: '3 × 10–12 ea', mode: 'reps', tags: ['triceps','tricep','arms','cable','unilateral'] },
+    { name: 'Overhead Tricep Extension', target: '3 × 10–12', mode: 'reps', tags: ['triceps','tricep','arms','long head','dumbbell','cable'] },
+    { name: 'Single-Arm Overhead Tricep Extension', target: '3 × 10–12 ea', mode: 'reps', tags: ['triceps','tricep','arms','dumbbell','unilateral'] },
+    { name: 'Cable Overhead Tricep Extension', target: '3 × 10–12', mode: 'reps', tags: ['triceps','tricep','arms','cable','rope','long head'] },
+    { name: 'Tricep Kickback', target: '3 × 10–12 ea', mode: 'reps', tags: ['triceps','tricep','arms','dumbbell','unilateral'] },
+    { name: 'Tate Press', target: '3 × 10–12', mode: 'reps', tags: ['triceps','tricep','arms','dumbbell'] },
+    { name: 'JM Press', target: '3 × 6–8', mode: 'reps', tags: ['triceps','tricep','chest','barbell'] },
+
+    // ===== LEGS — QUADS =====
+    { name: 'Barbell Back Squat', target: '3 × 5–8', mode: 'reps', tags: ['quads','glutes','squat','barbell','compound','legs','back squat'] },
+    { name: 'High-Bar Back Squat', target: '3 × 5–8', mode: 'reps', tags: ['quads','glutes','squat','barbell','legs'] },
+    { name: 'Low-Bar Back Squat', target: '3 × 5–6', mode: 'reps', tags: ['glutes','hamstrings','quads','squat','barbell','legs'] },
+    { name: 'Front Squat', target: '3 × 5–8', mode: 'reps', tags: ['quads','core','squat','barbell','legs'] },
+    { name: 'Smith Machine Squat', target: '3 × 6–8', mode: 'reps', tags: ['quads','glutes','squat','smith','legs'] },
+    { name: 'Goblet Squat', target: '3 × 8–10', mode: 'reps', tags: ['quads','glutes','squat','dumbbell','kettlebell','legs'] },
+    { name: 'Hack Squat', target: '3 × 8–10', mode: 'reps', tags: ['quads','squat','machine','legs'] },
+    { name: 'Leg Press', target: '3 × 8–10', mode: 'reps', tags: ['quads','glutes','machine','legs'] },
+    { name: 'Single-Leg Press', target: '3 × 10–12 ea', mode: 'reps', tags: ['quads','glutes','machine','unilateral','legs'] },
+    { name: 'Bulgarian Split Squat', target: '3 × 8–10 ea', mode: 'reps', tags: ['quads','glutes','lunge','dumbbell','barbell','unilateral','legs'] },
+    { name: 'Walking Lunge', target: '3 × 10–12 ea', mode: 'reps', tags: ['quads','glutes','lunge','dumbbell','unilateral','legs'] },
+    { name: 'Reverse Lunge', target: '3 × 8–10 ea', mode: 'reps', tags: ['quads','glutes','lunge','dumbbell','barbell','unilateral','legs'] },
+    { name: 'Forward Lunge', target: '3 × 8–10 ea', mode: 'reps', tags: ['quads','glutes','lunge','unilateral','legs'] },
+    { name: 'Lateral Lunge', target: '3 × 8–10 ea', mode: 'reps', tags: ['quads','glutes','adductors','lunge','unilateral','legs'] },
+    { name: 'Curtsy Lunge', target: '3 × 10–12 ea', mode: 'reps', tags: ['glutes','quads','adductors','lunge','unilateral'] },
+    { name: 'Step-Up', target: '3 × 10 ea', mode: 'reps', tags: ['quads','glutes','dumbbell','unilateral','legs'] },
+    { name: 'Sissy Squat', target: '3 × 10–15', mode: 'bodyweight', tags: ['quads','isolation','bodyweight','legs'] },
+    { name: 'Pistol Squat', target: '3 × 5–8 ea', mode: 'bodyweight', tags: ['quads','glutes','unilateral','bodyweight','legs'] },
+    { name: 'Pause Squat', target: '3 × 5', mode: 'reps', tags: ['quads','glutes','squat','barbell','paused'] },
+    { name: 'Box Squat', target: '3 × 5', mode: 'reps', tags: ['quads','glutes','squat','barbell'] },
+    { name: 'Zercher Squat', target: '3 × 6–8', mode: 'reps', tags: ['quads','glutes','core','squat','barbell'] },
+    { name: 'Leg Extension', target: '3 × 10–12', mode: 'reps', tags: ['quads','isolation','machine','legs'] },
+    { name: 'Single-Leg Extension', target: '3 × 12 ea', mode: 'reps', tags: ['quads','isolation','machine','unilateral'] },
+
+    // ===== LEGS — HAMSTRINGS / GLUTES =====
+    { name: 'Lying Leg Curl', target: '3 × 10–12', mode: 'reps', tags: ['hamstrings','machine','leg curl','hamstring curl'] },
+    { name: 'Seated Leg Curl', target: '3 × 10–12', mode: 'reps', tags: ['hamstrings','machine','leg curl','hamstring curl'] },
+    { name: 'Standing Single-Leg Curl', target: '3 × 12 ea', mode: 'reps', tags: ['hamstrings','machine','unilateral','leg curl'] },
+    { name: 'Nordic Hamstring Curl', target: '3 × 6–8', mode: 'bodyweight', tags: ['hamstrings','bodyweight','eccentric'] },
+    { name: 'Glute-Ham Raise', target: '3 × 8–10', mode: 'bodyweight', tags: ['hamstrings','glutes','lower back','ghr','bodyweight'] },
+    { name: 'Hip Thrust', target: '3 × 8–10', mode: 'reps', tags: ['glutes','barbell','hinge'] },
+    { name: 'Single-Leg Hip Thrust', target: '3 × 10–12 ea', mode: 'reps', tags: ['glutes','unilateral','bodyweight','dumbbell'] },
+    { name: 'Glute Bridge', target: '3 × 10–12', mode: 'reps', tags: ['glutes','hamstrings','hinge','barbell','dumbbell'] },
+    { name: 'B-Stance Hip Thrust', target: '3 × 10–12 ea', mode: 'reps', tags: ['glutes','unilateral','barbell'] },
+    { name: 'Cable Pull-Through', target: '3 × 10–12', mode: 'reps', tags: ['glutes','hamstrings','cable','hinge'] },
+    { name: 'Hip Abduction', target: '3 × 12–15', mode: 'reps', tags: ['glutes','machine','isolation'] },
+    { name: 'Cable Hip Abduction', target: '3 × 12–15 ea', mode: 'reps', tags: ['glutes','cable','unilateral'] },
+    { name: 'Hip Adduction', target: '3 × 12–15', mode: 'reps', tags: ['adductors','machine','isolation'] },
+    { name: 'Kettlebell Swing', target: '3 × 15–20', mode: 'reps', tags: ['glutes','hamstrings','kettlebell','hinge','power'] },
+
+    // ===== CALVES =====
+    { name: 'Standing Calf Raise', target: '3 × 12–15', mode: 'reps', tags: ['calves','machine','gastrocnemius'] },
+    { name: 'Smith Machine Calf Raise', target: '3 × 12–15', mode: 'reps', tags: ['calves','smith'] },
+    { name: 'Seated Calf Raise', target: '3 × 12–15', mode: 'reps', tags: ['calves','soleus','machine'] },
+    { name: 'Donkey Calf Raise', target: '3 × 12–15', mode: 'reps', tags: ['calves','gastrocnemius'] },
+    { name: 'Single-Leg Calf Raise', target: '3 × 12–15 ea', mode: 'reps', tags: ['calves','unilateral','dumbbell','bodyweight'] },
+    { name: 'Leg Press Calf Raise', target: '3 × 12–15', mode: 'reps', tags: ['calves','machine'] },
+    { name: 'Tibialis Raise', target: '3 × 15–20', mode: 'reps', tags: ['shins','tibialis'] },
+
+    // ===== ABS / CORE — time holds =====
+    { name: 'Plank', target: '3 × 30–60s', mode: 'time', tags: ['abs','core','isometric','hold','bodyweight'] },
+    { name: 'Side Plank', target: '3 × 30–45s ea', mode: 'time', tags: ['abs','core','obliques','isometric','hold','unilateral','bodyweight'] },
+    { name: 'RKC Plank', target: '3 × 15–30s', mode: 'time', tags: ['abs','core','isometric','hold','bodyweight'] },
+    { name: 'Hollow Hold', target: '3 × 20–40s', mode: 'time', tags: ['abs','core','isometric','hold','bodyweight'] },
+    { name: 'L-Sit', target: '3 × 10–30s', mode: 'time', tags: ['abs','core','isometric','hold','bodyweight'] },
+    { name: 'Dead Hang', target: '3 × 30–60s', mode: 'time', tags: ['grip','forearms','lats','isometric','hold','bodyweight'] },
+    // ===== ABS / CORE — reps =====
+    { name: 'Hanging Knee Raise', target: '3 × 10–15', mode: 'bodyweight', tags: ['abs','core','hip flexors','bodyweight'] },
+    { name: 'Hanging Leg Raise', target: '3 × 8–12', mode: 'bodyweight', tags: ['abs','core','hip flexors','bodyweight'] },
+    { name: 'Lying Leg Raise', target: '3 × 12–15', mode: 'bodyweight', tags: ['abs','lower abs','bodyweight'] },
+    { name: 'Cable Crunch', target: '3 × 12–15', mode: 'reps', tags: ['abs','core','cable'] },
+    { name: 'Crunch', target: '3 × 15–20', mode: 'bodyweight', tags: ['abs','core','bodyweight','crunches'] },
+    { name: 'Sit-Up', target: '3 × 15–20', mode: 'bodyweight', tags: ['abs','core','bodyweight'] },
+    { name: 'Decline Sit-Up', target: '3 × 12–15', mode: 'bodyweight', tags: ['abs','core','bodyweight'] },
+    { name: 'Weighted Decline Sit-Up', target: '3 × 10–12', mode: 'reps', tags: ['abs','core'] },
+    { name: 'Russian Twist', target: '3 × 15–20', mode: 'reps', tags: ['abs','obliques','core','plate','dumbbell'] },
+    { name: 'Wood Chopper', target: '3 × 10–12 ea', mode: 'reps', tags: ['abs','obliques','core','cable','unilateral'] },
+    { name: 'Cable Side Bend', target: '3 × 12–15 ea', mode: 'reps', tags: ['obliques','core','cable','unilateral'] },
+    { name: 'Dumbbell Side Bend', target: '3 × 12–15 ea', mode: 'reps', tags: ['obliques','core','dumbbell','unilateral'] },
+    { name: 'Ab Wheel Rollout', target: '3 × 8–12', mode: 'bodyweight', tags: ['abs','core','ab wheel','bodyweight'] },
+    { name: 'Dragon Flag', target: '3 × 5–8', mode: 'bodyweight', tags: ['abs','core','bodyweight'] },
+    { name: 'V-Up', target: '3 × 10–15', mode: 'bodyweight', tags: ['abs','core','bodyweight'] },
+    { name: 'Bicycle Crunch', target: '3 × 20 ea', mode: 'bodyweight', tags: ['abs','obliques','bodyweight'] },
+    { name: 'Dead Bug', target: '3 × 10 ea', mode: 'bodyweight', tags: ['core','abs','bodyweight'] },
+    { name: 'Bird Dog', target: '3 × 10 ea', mode: 'bodyweight', tags: ['core','lower back','glutes','bodyweight'] },
+    { name: 'Pallof Press', target: '3 × 10 ea', mode: 'reps', tags: ['core','obliques','cable','unilateral','anti-rotation'] },
+
+    // ===== FOREARMS / GRIP / CARRIES =====
+    { name: 'Wrist Curl', target: '3 × 12–15', mode: 'reps', tags: ['forearms','grip','barbell','dumbbell'] },
+    { name: 'Reverse Wrist Curl', target: '3 × 12–15', mode: 'reps', tags: ['forearms','grip','barbell','dumbbell'] },
+    { name: 'Behind-the-Back Wrist Curl', target: '3 × 12–15', mode: 'reps', tags: ['forearms','grip','barbell'] },
+    { name: 'Plate Pinch', target: '3 × 30s ea', mode: 'time', tags: ['grip','forearms','plate','unilateral','hold'] },
+    { name: "Farmer's Walk", target: '3 × 30–60s', mode: 'time', tags: ['grip','forearms','core','traps','carry','dumbbell','hold'] },
+    { name: 'Suitcase Carry', target: '3 × 30–45s ea', mode: 'time', tags: ['grip','core','obliques','carry','dumbbell','unilateral','hold'] }
   ];
 
   const STORAGE_KEY = 'liftlog_data_v2';
@@ -1635,7 +1815,7 @@
       },
       editing: {
         title: 'EDITING EXERCISES',
-        body: `<p>Tap any exercise <strong>name</strong> or <strong>target</strong> to edit. Suggestions appear as you type — picking one auto-fills the rep range.</p><p>Use <strong>+ ADD EXERCISE</strong> to add a custom lift. <strong>DELETE</strong> inside an expanded exercise removes it.</p>`
+        body: `<p>Long-press any exercise <strong>name</strong> or <strong>target</strong> to edit. Suggestions appear right under what you type — picking one auto-fills the target and switches the card to the right input style (weight + reps, hold time, or just reps).</p><p>Use <strong>+ ADD EXERCISE</strong> to add a custom lift. <strong>DELETE</strong> inside an expanded exercise removes it.</p>`
       },
       save_day: {
         title: 'SAVE DAY BEHAVIOR',
@@ -1655,6 +1835,20 @@
     // Change log — newest entry first. When pushing a new index.html with changes,
     // prepend a new { date, changes: [...] } object to the front of this array.
     const CHANGELOG = [
+      {
+        date: '2026-05-07',
+        changes: [
+          'The exercise autocomplete library is dramatically larger — full coverage of barbell, dumbbell, Smith machine, cable, and bodyweight variations across chest, back, shoulders, arms, legs, calves, abs, and grip work.',
+          'Suggestions are smarter. Typing "tricep" surfaces Skull Crushers, Pushdowns, and Close-Grip Bench even though "tricep" isn\'t in their names. Typing "incline" filters to incline variations across muscle groups. Tags and aliases now match alongside names.',
+          'Suggestions appear directly under what you\'re typing again, not at the bottom of the row card. Picking one no longer requires scrolling on mobile.',
+          'Targets reviewed for accuracy. Single-side lifts (Bulgarian Split Squat, Concentration Curl, Single-Arm Row, etc.) now end in "ea" so it\'s clear the rep count is per side.',
+          'Exercise cards now mold to the lift. Plank, Side Plank, L-Sit, Dead Hang, Farmer\'s Walk, and other holds show a single seconds field instead of weight + reps. Push-ups, Pull-ups, Hanging Leg Raises, and other bodyweight reps drop the weight column.',
+          'Long-press an exercise name or target to edit it (instead of double-click). One steady press, no awkward double-tap on mobile.',
+          'Picking a library suggestion now also resets that exercise\'s set rows to the right shape — no leftover weight/reps lingering when you switch a card to a hold or bodyweight movement.',
+          'Default Plank and Hanging Knee Raise on Saturday\'s Abs day now use the right input style automatically (seconds for the plank, reps-only for the knee raise).',
+          'Tag-based suggestions now actually show up. Typing "tricep" used to fill the dropdown with only the explicitly-named "Tricep ___" lifts, hiding Skull Crushers, Close-Grip Bench, Dips, etc. The dropdown now mixes name matches with tag matches so category words surface the cross-cutting lifts too.'
+        ]
+      },
       {
         date: '2026-05-06',
         changes: [
@@ -1705,7 +1899,7 @@
       <div class="info-section">
         <h3>FOR BEGINNERS</h3>
         <p><strong>The default split works as-is.</strong> PUSH, PULL, REST, LEGS, PUMP, ABS, REST — open the day tab, log your sets, hit SAVE DAY. Pick a weight you can finish all the listed reps with. When you can hit the top of the rep range with that weight, bump it up next session.</p>
-        <p>Customize names and exercises later via DAY ASSIGNMENT and double-tap-to-edit — or just keep following the defaults. The defaults are tuned for newcomers building the habit.</p>
+        <p>Customize names and exercises later via DAY ASSIGNMENT and long-press-to-edit — or just keep following the defaults. The defaults are tuned for newcomers building the habit.</p>
       </div>
 
       <div class="info-section">
@@ -2031,9 +2225,10 @@
   }
 
   function renderExerciseCard(ex, idx) {
-    const isCardio = !!ex.isCardio;
+    const mode = exerciseMode(ex);
 
-    if (isCardio) {
+    // ----- CARDIO (time + distance, single pair) -----
+    if (mode === 'cardio') {
       const data = getCardioData(ex.id);
       const lastEntry = data.history[data.history.length - 1];
       const lastSummary = lastEntry ? `${lastEntry.summary}` : '—';
@@ -2048,7 +2243,7 @@
         : '<div class="history-entry"><span>No history yet.</span></div>';
 
       return `
-        <div class="exercise" data-exercise="${ex.id}" data-idx="${idx}" data-cardio="true">
+        <div class="exercise" data-exercise="${ex.id}" data-idx="${idx}" data-mode="cardio">
           <div class="exercise-header">
             <div class="exercise-info">
               <div class="exercise-name" data-edit-name>${escapeHtml(ex.name)}</div>
@@ -2080,21 +2275,77 @@
       `;
     }
 
-    // Regular exercise
+    // ----- TIME / BODYWEIGHT / REPS (set-based) -----
     const data = getExerciseData(ex.id);
     const lastEntry = data.history[data.history.length - 1];
-    const lastWeight = lastEntry && lastEntry.topWeight !== undefined
-      ? (lastEntry.topReps ? `${lastEntry.topWeight} × ${lastEntry.topReps}` : `${lastEntry.topWeight} lb`)
-      : '—';
+    let lastSummary;
+    let lastLabel;
+    if (mode === 'time') {
+      lastLabel = 'Last Top';
+      lastSummary = (lastEntry && lastEntry.topTime !== undefined)
+        ? `${lastEntry.topTime}s`
+        : '—';
+    } else if (mode === 'bodyweight') {
+      lastLabel = 'Last Top';
+      lastSummary = (lastEntry && lastEntry.topReps !== undefined)
+        ? `${lastEntry.topReps} reps`
+        : '—';
+    } else {
+      lastLabel = 'Last Top';
+      lastSummary = (lastEntry && lastEntry.topWeight !== undefined)
+        ? (lastEntry.topReps ? `${lastEntry.topWeight} × ${lastEntry.topReps}` : `${lastEntry.topWeight} lb`)
+        : '—';
+    }
 
-    const setsHtml = data.sets.map((set, i) => `
-      <div class="set-row" data-exercise="${ex.id}" data-set="${i}">
-        <div class="set-num">${i+1}</div>
-        <input type="number" inputmode="decimal" placeholder="lb" value="${set.w}" data-field="w">
-        <input type="number" inputmode="numeric" placeholder="reps" value="${set.r}" data-field="r">
-        <button class="set-done ${set.d ? 'done' : ''}" data-field="d">${set.d ? '✓' : '○'}</button>
-      </div>
-    `).join('');
+    let setsHeaderHtml, setsHtml, modeClass;
+    if (mode === 'time') {
+      modeClass = 'sets-time';
+      setsHeaderHtml = `
+          <div class="sets-header">
+            <div></div>
+            <div>Time (sec)</div>
+            <div></div>
+          </div>`;
+      setsHtml = data.sets.map((set, i) => `
+        <div class="set-row" data-exercise="${ex.id}" data-set="${i}">
+          <div class="set-num">${i+1}</div>
+          <input type="number" inputmode="numeric" placeholder="sec" value="${set.t || ''}" data-field="t">
+          <button class="set-done ${set.d ? 'done' : ''}" data-field="d">${set.d ? '✓' : '○'}</button>
+        </div>
+      `).join('');
+    } else if (mode === 'bodyweight') {
+      modeClass = 'sets-bodyweight';
+      setsHeaderHtml = `
+          <div class="sets-header">
+            <div></div>
+            <div>Reps</div>
+            <div></div>
+          </div>`;
+      setsHtml = data.sets.map((set, i) => `
+        <div class="set-row" data-exercise="${ex.id}" data-set="${i}">
+          <div class="set-num">${i+1}</div>
+          <input type="number" inputmode="numeric" placeholder="reps" value="${set.r || ''}" data-field="r">
+          <button class="set-done ${set.d ? 'done' : ''}" data-field="d">${set.d ? '✓' : '○'}</button>
+        </div>
+      `).join('');
+    } else {
+      modeClass = 'sets-reps';
+      setsHeaderHtml = `
+          <div class="sets-header">
+            <div></div>
+            <div>Weight</div>
+            <div>Reps</div>
+            <div></div>
+          </div>`;
+      setsHtml = data.sets.map((set, i) => `
+        <div class="set-row" data-exercise="${ex.id}" data-set="${i}">
+          <div class="set-num">${i+1}</div>
+          <input type="number" inputmode="decimal" placeholder="lb" value="${set.w || ''}" data-field="w">
+          <input type="number" inputmode="numeric" placeholder="reps" value="${set.r || ''}" data-field="r">
+          <button class="set-done ${set.d ? 'done' : ''}" data-field="d">${set.d ? '✓' : '○'}</button>
+        </div>
+      `).join('');
+    }
 
     const historyHtml = data.history.length > 0
       ? data.history.slice(-5).reverse().map(h => `
@@ -2106,24 +2357,19 @@
       : '<div class="history-entry"><span>No history yet.</span></div>';
 
     return `
-      <div class="exercise" data-exercise="${ex.id}" data-idx="${idx}">
+      <div class="exercise" data-exercise="${ex.id}" data-idx="${idx}" data-mode="${mode}">
         <div class="exercise-header">
           <div class="exercise-info">
             <div class="exercise-name" data-edit-name>${escapeHtml(ex.name)}</div>
             <div class="exercise-target" data-edit-target>${escapeHtml(ex.target)}</div>
           </div>
           <div class="last-weight">
-            <span class="label">Last Top</span>
-            ${lastWeight}
+            <span class="label">${lastLabel}</span>
+            ${lastSummary}
           </div>
         </div>
-        <div class="sets">
-          <div class="sets-header">
-            <div></div>
-            <div>Weight</div>
-            <div>Reps</div>
-            <div></div>
-          </div>
+        <div class="sets ${modeClass}">
+          ${setsHeaderHtml}
           ${setsHtml}
           <button class="history-toggle" data-action="toggle-history">View History</button>
           <div class="history">
@@ -2162,20 +2408,16 @@
       });
     });
 
-    // Inline editable name — double-click to enter edit mode (avoids accidental edits on tap-to-open)
+    // Inline editable name — LONG-PRESS (~500ms) to enter edit mode. Long-press
+    // beats dblclick on mobile (no awkward double-tap-zoom interaction) and
+    // avoids accidental edits on tap-to-open.
     document.querySelectorAll('[data-edit-name]').forEach(el => {
-      el.addEventListener('dblclick', (e) => {
-        e.stopPropagation();
-        startEditName(el);
-      });
+      attachLongPress(el, () => startEditName(el));
     });
 
-    // Inline editable target — double-click to enter edit mode
+    // Inline editable target — long-press to enter edit mode.
     document.querySelectorAll('[data-edit-target]').forEach(el => {
-      el.addEventListener('dblclick', (e) => {
-        e.stopPropagation();
-        startEditTarget(el);
-      });
+      attachLongPress(el, () => startEditTarget(el));
     });
 
     // Set inputs
@@ -2261,6 +2503,60 @@
     }
   }
 
+  // ============ LONG-PRESS ============
+  // Cross-platform long-press helper. Pointer-down starts a 500ms timer; if the
+  // user holds still for the duration the callback fires and the trailing click
+  // is suppressed (so the exercise card doesn't expand/collapse on release).
+  // Movement of more than ~8px or an early pointerup cancels.
+  function attachLongPress(el, callback, ms = 500) {
+    let timer = null;
+    let suppressClick = false;
+    let startX = 0, startY = 0;
+
+    const cancel = () => {
+      if (timer) { clearTimeout(timer); timer = null; }
+    };
+
+    el.addEventListener('pointerdown', (e) => {
+      if (el.classList.contains('editing')) return;
+      // Right-clicks and stylus barrel etc. shouldn't fire edit.
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      suppressClick = false;
+      startX = e.clientX;
+      startY = e.clientY;
+      cancel();
+      timer = setTimeout(() => {
+        timer = null;
+        suppressClick = true;
+        callback();
+      }, ms);
+    });
+
+    el.addEventListener('pointermove', (e) => {
+      if (!timer) return;
+      if (Math.abs(e.clientX - startX) > 8 || Math.abs(e.clientY - startY) > 8) cancel();
+    });
+
+    el.addEventListener('pointerup', cancel);
+    el.addEventListener('pointercancel', cancel);
+    el.addEventListener('pointerleave', cancel);
+
+    // iOS shows a Copy/Look Up callout on long-press by default. Suppress it.
+    el.addEventListener('contextmenu', (e) => {
+      if (!el.classList.contains('editing')) e.preventDefault();
+    });
+
+    // Capture-phase click handler so we can stop the click from bubbling up to
+    // the .exercise-header expand/collapse handler when long-press fired.
+    el.addEventListener('click', (e) => {
+      if (suppressClick) {
+        e.stopPropagation();
+        e.preventDefault();
+        suppressClick = false;
+      }
+    }, true);
+  }
+
   // ============ INLINE EDIT ============
   function startEditName(el) {
     if (el.classList.contains('editing')) return;
@@ -2278,8 +2574,8 @@
     input.focus();
     input.setSelectionRange(input.value.length, input.value.length);
 
-    // Autocomplete
-    setupAutocomplete(input, exerciseEl, exercise);
+    // Autocomplete (anchors under the input — see showAutocomplete)
+    setupAutocomplete(input, exercise);
 
     let committed = false;
     const commit = () => {
@@ -2351,53 +2647,117 @@
   }
 
   // ============ AUTOCOMPLETE ============
-  function setupAutocomplete(input, exerciseEl, exercise) {
-    const updateSuggestions = () => {
-      const query = input.value.trim().toLowerCase();
-      if (query.length < 1) {
-        closeAutocomplete();
-        return;
+  // Smart search across exercise NAME and TAGS so category words ("tricep",
+  // "chest", "lunge") surface relevant lifts even when the typed string isn't
+  // in the exercise name. We bucket results into name-matches and tag-only
+  // matches, then cap the name bucket so a flood of "Tricep ___" entries can't
+  // crowd out tag-only matches like "Skull Crusher".
+  function searchExerciseLibrary(query) {
+    const q = (query || '').trim().toLowerCase();
+    if (q.length < 1) return [];
+    const tokens = q.split(/\s+/).filter(Boolean);
+
+    const nameMatches = [];
+    const tagMatches = [];
+
+    for (const item of EXERCISE_LIBRARY) {
+      const name = item.name.toLowerCase();
+      const tags = (item.tags || []).map(t => t.toLowerCase());
+      const tagText = tags.join(' ');
+
+      // Each query token must be findable in name OR tags. Skip otherwise.
+      const allTokensMatch = tokens.every(t => name.includes(t) || tagText.includes(t));
+      if (!allTokensMatch) continue;
+
+      // Name-based scoring (tier 1: prefix > word-start > substring)
+      let nameScore = 0;
+      if (name.startsWith(q)) nameScore = 200;
+      else if (name.split(/[\s\-]+/).some(w => w.startsWith(q))) nameScore = 120;
+      else if (name.includes(q)) nameScore = 60;
+
+      if (nameScore > 0) {
+        nameMatches.push({ item, score: nameScore });
+        continue;
       }
-      const matches = EXERCISE_LIBRARY
-        .filter(item => item.name.toLowerCase().includes(query))
-        .slice(0, 6);
+
+      // Tag-only match — score by position of the matching tag (primary tag
+      // = strongest signal). E.g. "tricep" matching tags[0]='triceps' on Skull
+      // Crusher beats a deep-buried tag match elsewhere.
+      let tagScore = 0;
+      const idx = tags.findIndex(t => t === q || t.includes(q));
+      if (idx >= 0) tagScore = Math.max(40, 110 - idx * 10);
+      else if (tagText.includes(q)) tagScore = 30;
+
+      if (tagScore > 0) tagMatches.push({ item, score: tagScore });
+    }
+
+    const cmp = (a, b) => b.score - a.score || a.item.name.localeCompare(b.item.name);
+    nameMatches.sort(cmp);
+    tagMatches.sort(cmp);
+
+    // Hybrid output: top NAME_CAP name matches first, then tag matches up to
+    // MAX, then any remaining name matches if there's still room.
+    const MAX = 12;
+    const NAME_CAP = 5;
+    const out = [];
+    for (let i = 0; i < Math.min(NAME_CAP, nameMatches.length); i++) out.push(nameMatches[i].item);
+    for (const m of tagMatches) {
+      if (out.length >= MAX) break;
+      out.push(m.item);
+    }
+    for (let i = NAME_CAP; i < nameMatches.length && out.length < MAX; i++) {
+      out.push(nameMatches[i].item);
+    }
+    return out;
+  }
+
+  function setupAutocomplete(input, exercise) {
+    const updateSuggestions = () => {
+      const matches = searchExerciseLibrary(input.value);
       if (matches.length === 0) {
         closeAutocomplete();
         return;
       }
-      showAutocomplete(matches, input, exerciseEl, exercise);
+      showAutocomplete(matches, input, exercise);
     };
 
     input.addEventListener('input', updateSuggestions);
     updateSuggestions();
   }
 
-  function showAutocomplete(matches, input, exerciseEl, exercise) {
+  function showAutocomplete(matches, input, exercise) {
     closeAutocomplete();
+    // Anchor the suggestion list to the editing element (the .exercise-name div
+    // hosting the input), not the whole .exercise card. That keeps the list
+    // visible right under what the user is typing — important on mobile where
+    // the card-anchored list could fall below the visible area.
+    const anchor = input.parentElement;
+    if (!anchor) return;
     const list = document.createElement('div');
     list.className = 'autocomplete-list';
     list.innerHTML = matches.map(m => `
-      <div class="autocomplete-item" data-name="${escapeHtml(m.name)}" data-target="${escapeHtml(m.target)}">
+      <div class="autocomplete-item" data-name="${escapeHtml(m.name)}" data-target="${escapeHtml(m.target)}" data-mode="${escapeHtml(m.mode || 'reps')}">
         <span>${escapeHtml(m.name)}</span>
         <span class="target-hint">${escapeHtml(m.target)}</span>
       </div>
     `).join('');
-    exerciseEl.appendChild(list);
+    anchor.appendChild(list);
     activeAutocomplete = list;
 
     list.querySelectorAll('.autocomplete-item').forEach(item => {
-      item.addEventListener('mousedown', (e) => {
-        // mousedown fires before blur, so we can update before commit
+      // pointerdown fires before the input's blur, so we can mutate state before
+      // commit. preventDefault keeps focus on the input until blur() runs below.
+      item.addEventListener('pointerdown', (e) => {
         e.preventDefault();
-        input.value = item.dataset.name;
-        // Update target
-        exercise.target = item.dataset.target;
-        // Commit name immediately
+        const newName = item.dataset.name;
+        const newTarget = item.dataset.target;
+        const newMode = item.dataset.mode || 'reps';
+        input.value = newName;
+        exercise.target = newTarget;
+        applyExerciseMode(exercise, newMode);
         input.blur();
-        // Re-render to show updated target
         setTimeout(() => {
           renderContent();
-          // Re-expand the same exercise so user doesn't lose context
           const card = document.querySelector(`.exercise[data-exercise="${exercise.id}"]`);
           if (card) card.classList.add('expanded');
         }, 200);
@@ -2409,6 +2769,44 @@
     if (activeAutocomplete) {
       activeAutocomplete.remove();
       activeAutocomplete = null;
+    }
+  }
+
+  // Returns the resolved mode for an exercise, falling back to legacy isCardio.
+  function exerciseMode(ex) {
+    if (!ex) return 'reps';
+    if (ex.mode) return ex.mode;
+    if (ex.isCardio) return 'cardio';
+    return 'reps';
+  }
+
+  // Default fresh sets array for a given mode. New empty rows so the user has
+  // something to fill in immediately.
+  function defaultSetsForMode(mode) {
+    switch (mode) {
+      case 'time': return [{t:'',d:false},{t:'',d:false},{t:'',d:false}];
+      case 'bodyweight': return [{r:'',d:false},{r:'',d:false},{r:'',d:false}];
+      default: return [{w:'',r:'',d:false},{w:'',r:'',d:false},{w:'',r:'',d:false}];
+    }
+  }
+
+  // Switch an exercise to a new mode. Resets its sets to a fresh shape so old
+  // weight/reps don't linger in time-mode fields. History is preserved.
+  function applyExerciseMode(exercise, newMode) {
+    const oldMode = exerciseMode(exercise);
+    exercise.mode = newMode;
+    exercise.isCardio = (newMode === 'cardio');
+    if (oldMode !== newMode) {
+      const data = state.exerciseData[exercise.id];
+      if (data) {
+        if (newMode === 'cardio') {
+          data.sets = [];
+          data.cardio = { time: '', distance: '' };
+        } else {
+          data.sets = defaultSetsForMode(newMode);
+          delete data.cardio;
+        }
+      }
     }
   }
 
@@ -2467,66 +2865,120 @@
     const newPRs = [];
 
     workout.exercises.forEach(ex => {
-      if (ex.isCardio) {
+      const mode = exerciseMode(ex);
+
+      if (mode === 'cardio') {
         const data = getCardioData(ex.id);
         if (data.cardio.time || data.cardio.distance) {
           const summary = [
             data.cardio.time ? `${data.cardio.time}min` : null,
             data.cardio.distance ? `${data.cardio.distance}mi` : null
           ].filter(Boolean).join(' / ');
-          // Remove any existing same-day entry
           data.history = data.history.filter(h => h.iso !== isoDate);
           data.history.push({ date: dateStr, iso: isoDate, summary });
           if (data.history.length > 60) data.history = data.history.slice(-60);
           savedCount++;
         }
-      } else {
-        const data = getExerciseData(ex.id);
-        const validSets = data.sets.filter(s => s.w && s.r);
+        return;
+      }
+
+      const data = getExerciseData(ex.id);
+
+      if (mode === 'time') {
+        const validSets = data.sets.filter(s => s.t);
         if (validSets.length === 0) return;
+        const topTime = Math.max(...validSets.map(s => parseFloat(s.t) || 0));
+        const summary = validSets.map(s => `${s.t}s`).join(', ');
 
-        const topWeight = Math.max(...validSets.map(s => parseFloat(s.w) || 0));
-        // Find highest rep count among sets at the top weight
-        const topReps = Math.max(...validSets
-          .filter(s => parseFloat(s.w) === topWeight)
-          .map(s => parseInt(s.r) || 0));
-        const summary = validSets.map(s => `${s.w}×${s.r}`).join(', ');
-
-        // PR check: compare new effort against history *excluding* same-day entries.
-        // PR = higher weight, OR same weight at higher reps.
         const prevHistory = data.history.filter(h => h.iso !== isoDate);
         let prevBest = null;
         prevHistory.forEach(h => {
-          if (h.topWeight === undefined) return;
-          if (!prevBest) { prevBest = h; return; }
-          if (h.topWeight > prevBest.topWeight ||
-             (h.topWeight === prevBest.topWeight && (h.topReps || 0) > (prevBest.topReps || 0))) {
-            prevBest = h;
-          }
+          if (h.topTime === undefined) return;
+          if (!prevBest || h.topTime > prevBest.topTime) prevBest = h;
         });
-
-        const isPR = !prevBest ||
-                     topWeight > prevBest.topWeight ||
-                     (topWeight === prevBest.topWeight && topReps > (prevBest.topReps || 0));
-
-        if (isPR && topReps > 0) {
-          newPRs.push({
-            name: ex.name,
-            weight: topWeight,
-            reps: topReps,
-            prev: prevBest ? { weight: prevBest.topWeight, reps: prevBest.topReps || 0 } : null
-          });
+        const isPR = !prevBest || topTime > prevBest.topTime;
+        if (isPR && topTime > 0) {
+          newPRs.push({ name: ex.name, time: topTime, prev: prevBest ? { time: prevBest.topTime } : null });
         }
 
-        // Remove any existing same-day entry, then add new
         data.history = data.history.filter(h => h.iso !== isoDate);
-        data.history.push({ date: dateStr, iso: isoDate, summary, topWeight, topReps });
+        data.history.push({ date: dateStr, iso: isoDate, summary, topTime });
         if (data.history.length > 60) data.history = data.history.slice(-60);
-
-        // Reset tickers only — keep weight + reps for continuity
         data.sets.forEach(s => { s.d = false; });
         savedCount++;
+        return;
       }
+
+      if (mode === 'bodyweight') {
+        const validSets = data.sets.filter(s => s.r);
+        if (validSets.length === 0) return;
+        const topReps = Math.max(...validSets.map(s => parseInt(s.r) || 0));
+        const summary = validSets.map(s => `${s.r}`).join(', ');
+
+        const prevHistory = data.history.filter(h => h.iso !== isoDate);
+        let prevBest = null;
+        prevHistory.forEach(h => {
+          if (h.topReps === undefined || h.topWeight !== undefined) return;
+          if (!prevBest || h.topReps > prevBest.topReps) prevBest = h;
+        });
+        const isPR = !prevBest || topReps > (prevBest.topReps || 0);
+        if (isPR && topReps > 0) {
+          newPRs.push({ name: ex.name, reps: topReps, prev: prevBest ? { reps: prevBest.topReps || 0 } : null });
+        }
+
+        data.history = data.history.filter(h => h.iso !== isoDate);
+        data.history.push({ date: dateStr, iso: isoDate, summary, topReps });
+        if (data.history.length > 60) data.history = data.history.slice(-60);
+        data.sets.forEach(s => { s.d = false; });
+        savedCount++;
+        return;
+      }
+
+      // mode === 'reps' (default standard weight + reps)
+      const validSets = data.sets.filter(s => s.w && s.r);
+      if (validSets.length === 0) return;
+
+      const topWeight = Math.max(...validSets.map(s => parseFloat(s.w) || 0));
+      // Find highest rep count among sets at the top weight
+      const topReps = Math.max(...validSets
+        .filter(s => parseFloat(s.w) === topWeight)
+        .map(s => parseInt(s.r) || 0));
+      const summary = validSets.map(s => `${s.w}×${s.r}`).join(', ');
+
+      // PR check: compare new effort against history *excluding* same-day entries.
+      // PR = higher weight, OR same weight at higher reps.
+      const prevHistory = data.history.filter(h => h.iso !== isoDate);
+      let prevBest = null;
+      prevHistory.forEach(h => {
+        if (h.topWeight === undefined) return;
+        if (!prevBest) { prevBest = h; return; }
+        if (h.topWeight > prevBest.topWeight ||
+           (h.topWeight === prevBest.topWeight && (h.topReps || 0) > (prevBest.topReps || 0))) {
+          prevBest = h;
+        }
+      });
+
+      const isPR = !prevBest ||
+                   topWeight > prevBest.topWeight ||
+                   (topWeight === prevBest.topWeight && topReps > (prevBest.topReps || 0));
+
+      if (isPR && topReps > 0) {
+        newPRs.push({
+          name: ex.name,
+          weight: topWeight,
+          reps: topReps,
+          prev: prevBest ? { weight: prevBest.topWeight, reps: prevBest.topReps || 0 } : null
+        });
+      }
+
+      // Remove any existing same-day entry, then add new
+      data.history = data.history.filter(h => h.iso !== isoDate);
+      data.history.push({ date: dateStr, iso: isoDate, summary, topWeight, topReps });
+      if (data.history.length > 60) data.history = data.history.slice(-60);
+
+      // Reset tickers only — keep weight + reps for continuity
+      data.sets.forEach(s => { s.d = false; });
+      savedCount++;
     });
 
     if (savedCount === 0) {
@@ -2593,28 +3045,28 @@
     lines.push('');
 
     lines.push('SECTION,EXERCISES');
-    lines.push('TYPE,WORKOUT_KEY,EXERCISE_ID,NAME,TARGET,IS_CARDIO');
+    lines.push('TYPE,WORKOUT_KEY,EXERCISE_ID,NAME,TARGET,IS_CARDIO,MODE');
     Object.entries(s.workouts || {}).forEach(([k,w]) => {
       (w.exercises || []).forEach(ex => {
-        lines.push(csvRow(['EXERCISE', k, ex.id, ex.name || '', ex.target || '', !!ex.isCardio]));
+        lines.push(csvRow(['EXERCISE', k, ex.id, ex.name || '', ex.target || '', !!ex.isCardio, ex.mode || '']));
       });
     });
     lines.push('');
 
     lines.push('SECTION,SETS');
-    lines.push('TYPE,EXERCISE_ID,INDEX,WEIGHT,REPS,DONE');
+    lines.push('TYPE,EXERCISE_ID,INDEX,WEIGHT,REPS,DONE,TIME');
     Object.entries(s.exerciseData || {}).forEach(([exId, data]) => {
       (data.sets || []).forEach((st, i) => {
-        lines.push(csvRow(['SET', exId, i, st.w || '', st.r || '', !!st.d]));
+        lines.push(csvRow(['SET', exId, i, st.w || '', st.r || '', !!st.d, st.t || '']));
       });
     });
     lines.push('');
 
     lines.push('SECTION,HISTORY');
-    lines.push('TYPE,EXERCISE_ID,DATE,ISO,SUMMARY,TOP_WEIGHT,TOP_REPS');
+    lines.push('TYPE,EXERCISE_ID,DATE,ISO,SUMMARY,TOP_WEIGHT,TOP_REPS,TOP_TIME');
     Object.entries(s.exerciseData || {}).forEach(([exId, data]) => {
       (data.history || []).forEach(h => {
-        lines.push(csvRow(['HISTORY', exId, h.date || '', h.iso || '', h.summary || '', h.topWeight !== undefined ? h.topWeight : '', h.topReps !== undefined ? h.topReps : '']));
+        lines.push(csvRow(['HISTORY', exId, h.date || '', h.iso || '', h.summary || '', h.topWeight !== undefined ? h.topWeight : '', h.topReps !== undefined ? h.topReps : '', h.topTime !== undefined ? h.topTime : '']));
       });
     });
     lines.push('');
@@ -2696,27 +3148,33 @@
           exercises: []
         };
       } else if (t === 'EXERCISE') {
-        const [, workoutKey, exId, name, target, isCardio] = row;
+        const [, workoutKey, exId, name, target, isCardio, mode] = row;
         if (s.workouts[workoutKey]) {
-          s.workouts[workoutKey].exercises.push({
+          const ex = {
             id: exId,
             name: name || '',
             target: target || '',
             isCardio: isCardio === 'true'
-          });
+          };
+          if (mode) ex.mode = mode;
+          else if (ex.isCardio) ex.mode = 'cardio';
+          s.workouts[workoutKey].exercises.push(ex);
         }
       } else if (t === 'SET') {
-        const [, exId, idx, w, r, d] = row;
+        const [, exId, idx, w, r, d, time] = row;
         if (!s.exerciseData[exId]) s.exerciseData[exId] = { sets: [], history: [] };
         const ix = parseInt(idx);
         while (s.exerciseData[exId].sets.length <= ix) s.exerciseData[exId].sets.push({ w:'', r:'', d:false });
-        s.exerciseData[exId].sets[ix] = { w: w || '', r: r || '', d: d === 'true' };
+        const setObj = { w: w || '', r: r || '', d: d === 'true' };
+        if (time) setObj.t = time;
+        s.exerciseData[exId].sets[ix] = setObj;
       } else if (t === 'HISTORY') {
-        const [, exId, date, iso, summary, topWeight, topReps] = row;
+        const [, exId, date, iso, summary, topWeight, topReps, topTime] = row;
         if (!s.exerciseData[exId]) s.exerciseData[exId] = { sets: [], history: [] };
         const entry = { date: date || '', iso: iso || '', summary: summary || '' };
         if (topWeight !== '' && topWeight !== undefined) entry.topWeight = parseFloat(topWeight);
         if (topReps !== '' && topReps !== undefined) entry.topReps = parseInt(topReps);
+        if (topTime !== '' && topTime !== undefined) entry.topTime = parseFloat(topTime);
         s.exerciseData[exId].history.push(entry);
       } else if (t === 'CARDIO') {
         const [, exId, time, distance] = row;
@@ -3003,13 +3461,23 @@
     if (!popup || !list) return;
 
     list.innerHTML = prs.map(pr => {
-      const prevText = pr.prev
-        ? `Previous: ${pr.prev.weight}${pr.prev.reps ? ' × ' + pr.prev.reps : ' lb'}`
-        : 'First entry';
+      let detail, prevText;
+      if (pr.time !== undefined) {
+        detail = `${pr.time}s`;
+        prevText = pr.prev ? `Previous: ${pr.prev.time}s` : 'First entry';
+      } else if (pr.weight === undefined && pr.reps !== undefined) {
+        detail = `${pr.reps} reps`;
+        prevText = pr.prev ? `Previous: ${pr.prev.reps} reps` : 'First entry';
+      } else {
+        detail = `${pr.weight} × ${pr.reps}`;
+        prevText = pr.prev
+          ? `Previous: ${pr.prev.weight}${pr.prev.reps ? ' × ' + pr.prev.reps : ' lb'}`
+          : 'First entry';
+      }
       return `
         <div class="pr-entry">
           <div class="pr-entry-name">${escapeHtml(pr.name)}</div>
-          <div class="pr-entry-detail">${pr.weight} × ${pr.reps}</div>
+          <div class="pr-entry-detail">${detail}</div>
           <div class="pr-entry-prev">${prevText}</div>
         </div>
       `;
