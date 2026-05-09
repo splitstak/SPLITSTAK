@@ -467,6 +467,65 @@
 
   .exercise.expanded .sets { display: block; }
 
+  /* "Last-selected" — the row the user is currently on or was most
+     recently on. The PARENT ROW goes orange (with inverted text/badge
+     so they stay readable). The dropdown stays in its default dark
+     theme but gets a 2px orange L/R/bottom border so it visually
+     belongs to the orange parent above. Exactly one exercise has this
+     at a time. */
+  .exercise.last-selected {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .exercise.last-selected .exercise-header {
+    background: var(--accent);
+  }
+
+  /* Dropdown frame: orange L/R/bottom borders so the expanded section
+     reads as the lower half of the highlighted card. Top edge meets the
+     orange parent row, so it gets no top border. The interior stays
+     dark — original styling preserved. */
+  .exercise.last-selected .sets {
+    border-left: 2px solid var(--accent);
+    border-right: 2px solid var(--accent);
+    border-bottom: 2px solid var(--accent);
+    border-top: none;
+  }
+
+  /* Parent-row text inverts to dark for contrast against orange. */
+  .exercise.last-selected .exercise-name,
+  .exercise.last-selected .exercise-target,
+  .exercise.last-selected .last-weight,
+  .exercise.last-selected .last-weight .label {
+    color: var(--bg);
+  }
+
+  /* Hover for inline-editable name/target on the orange parent row.
+     Default hover bg --surface-2 is dark — high contrast against
+     orange — but the dark text set above would disappear into it,
+     so flip text back to --text light when the hover bg shows. */
+  .exercise.last-selected .exercise-name:hover,
+  .exercise.last-selected .exercise-target:hover {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+  .exercise.last-selected .exercise-name.editing,
+  .exercise.last-selected .exercise-target.editing {
+    background: var(--bg);
+    color: var(--text);
+    outline-color: var(--bg);
+  }
+
+  /* Completion badge inverts on the orange parent: dark circle. The
+     icon's own near-black background blends with the dark circle and
+     its orange logo bars stay visible — preserving the badge's
+     identity while staying readable on orange. */
+  .exercise.last-selected .completion-badge {
+    background: var(--bg);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.4);
+  }
+
   /* Time-only and bodyweight-only modes drop the second value column. */
   .sets.sets-time .sets-header,
   .sets.sets-time .set-row,
@@ -542,16 +601,29 @@
     color: var(--bg);
   }
 
-  /* Cardio row layout: Time + Distance + 50px tick column. Mirrors the
-     set-based row's tick column (also 50px) so the tick aligns visually
-     with set ticks across the day. */
+  /* Cardio row layout. Mirrors .set-row's 4-column grid horizontally
+     (40px / 1fr / 1fr / 50px) so the tick column lands at the same
+     right edge as set-row's tick column. Two grid rows: labels on
+     row 1, inputs + tick on row 2 — that way the tick vertically
+     aligns with the input on the same row instead of with the
+     bottom of the label-plus-input stack. The wrapper divs use
+     display: contents so their label + input children are direct
+     grid items. */
   .cardio-fields {
     display: grid;
-    grid-template-columns: 1fr 1fr 50px;
-    gap: 10px;
-    align-items: end;
+    grid-template-columns: 40px 1fr 1fr 50px;
+    grid-template-rows: auto auto;
+    column-gap: 10px;
+    row-gap: 4px;
+    align-items: center;
     margin-bottom: 8px;
   }
+  .cardio-fields > div { display: contents; }
+  .cardio-fields > div:nth-child(1) > label { grid-column: 2; grid-row: 1; }
+  .cardio-fields > div:nth-child(1) > input { grid-column: 2; grid-row: 2; min-width: 0; }
+  .cardio-fields > div:nth-child(2) > label { grid-column: 3; grid-row: 1; }
+  .cardio-fields > div:nth-child(2) > input { grid-column: 3; grid-row: 2; min-width: 0; }
+  .cardio-fields > button { grid-column: 4; grid-row: 2; }
 
   .cardio-fields label {
     display: block;
@@ -1677,6 +1749,12 @@
   const DAY_FULL_NAMES = { MON: 'MONDAY', TUE: 'TUESDAY', WED: 'WEDNESDAY', THU: 'THURSDAY', FRI: 'FRIDAY', SAT: 'SATURDAY', SUN: 'SUNDAY' };
   let pendingDayAssignment = null;
 
+  // The exercise the user is currently on (or was most recently on).
+  // Highlighted orange on its parent row — and its dropdown when open —
+  // so the user can spot their place after collapsing or scrolling.
+  // Exactly one exercise has this at any time. View-only — not persisted.
+  let lastSelectedExerciseId = null;
+
   // Day-row picker open state. Module-level so toggling re-renders work.
   // Reset on any tab change (see switchTab).
   let dayPickerOpen = false;
@@ -2034,6 +2112,12 @@
     // Change log — newest entry first. When pushing a new index.html with changes,
     // prepend a new { date, changes: [...] } object to the front of this array.
     const CHANGELOG = [
+      {
+        date: '2026-05-09',
+        changes: [
+          'The exercise you\'re currently logging now stays highlighted in orange — the parent row turns orange when you tap an exercise to open it, and stays orange even after you collapse it, so you can spot at a glance which one you were last working on. Opening a different exercise moves the highlight to it. The dropdown gets a matching orange border so it visually belongs to the highlighted parent.'
+        ]
+      },
       {
         date: '2026-05-08',
         changes: [
@@ -2601,14 +2685,34 @@
     // Day picker lives in the top-tab strip now (#dayTabSelect, wired in
     // renderTopTabs). No in-view dropdown to attach here anymore.
 
-    // Expand/collapse
+    // Expand/collapse + last-selected tracking. Opening an exercise
+    // marks it as the last-selected one; collapsing leaves the orange
+    // highlight in place so the user can find their spot. Opening a
+    // different exercise transfers the highlight to the new one.
     document.querySelectorAll('.exercise-header').forEach(header => {
       header.addEventListener('click', (e) => {
         // Don't toggle if user is editing inline
         if (e.target.closest('.inline-edit') || e.target.classList.contains('editing')) return;
-        header.parentElement.classList.toggle('expanded');
+        const exerciseEl = header.parentElement;
+        const wasExpanded = exerciseEl.classList.contains('expanded');
+        exerciseEl.classList.toggle('expanded');
+        if (!wasExpanded) {
+          document.querySelectorAll('.exercise.last-selected').forEach(el => {
+            if (el !== exerciseEl) el.classList.remove('last-selected');
+          });
+          exerciseEl.classList.add('last-selected');
+          lastSelectedExerciseId = exerciseEl.dataset.exercise;
+        }
       });
     });
+
+    // Re-apply the last-selected highlight after re-renders (delete
+    // history, edit name, etc. all rebuild the day view). The in-memory
+    // id survives the re-render even though DOM classes don't.
+    if (lastSelectedExerciseId) {
+      const el = document.querySelector(`.exercise[data-exercise="${CSS.escape(lastSelectedExerciseId)}"]`);
+      if (el) el.classList.add('last-selected');
+    }
 
     // Inline editable name — LONG-PRESS (~500ms) to enter edit mode. Long-press
     // beats dblclick on mobile (no awkward double-tap-zoom interaction) and
