@@ -2404,6 +2404,11 @@
     ];
     const defaultChangelogDate = CHANGELOG[0] ? CHANGELOG[0].date : null;
 
+    // Hide the "download the Android app" card when we're already running
+    // inside the Capacitor native shell — telling the user to install the
+    // app they're already in would be confusing.
+    const isNativeApp = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
+
     content.innerHTML = `
       <h1 class="page-title">INFO</h1>
       <div class="page-subtitle">How this app works</div>
@@ -2414,12 +2419,12 @@
         <p>Visit DATA + SETNG → BACKUP & RESTORE and hit EXPORT regularly. It downloads a CSV file — save it to cloud storage or email it to yourself. Use IMPORT to restore from that CSV later. There is no cloud sync, no account, no automatic backup.</p>
       </div>
 
-      <div class="info-section">
+      ${isNativeApp ? '' : `<div class="info-section">
         <h3>ANDROID APP</h3>
         <p>The native Android app adds a <strong>lock-screen widget</strong> — tick sets, adjust weight and reps with ± buttons, and watch the rest timer right from your lock screen. Native lock-screen notifications fire for the 10-second warning and finish even when the app is closed.</p>
         <p>Each install keeps its own storage. To move your history across: <strong>DATA + SETNG → BACKUP & RESTORE → Export</strong> the CSV here, then Import it inside the Android app after installing.</p>
-        <a class="finish-day" href="https://github.com/splitstak/SPLITSTAK/releases/tag/v0.1.0-android-beta" target="_blank" rel="noopener" style="display: block; text-decoration: none; text-align: center; margin-top: 14px;">DOWNLOAD ANDROID APP</a>
-      </div>
+        <a class="finish-day" href="https://github.com/splitstak/SPLITSTAK/releases/download/v0.1.0-android-beta/splitstak.apk" target="_blank" rel="noopener" style="display: block; text-decoration: none; text-align: center; margin-top: 14px;">DOWNLOAD ANDROID APP</a>
+      </div>`}
 
       <div class="info-section">
         <h3>FOR BEGINNERS</h3>
