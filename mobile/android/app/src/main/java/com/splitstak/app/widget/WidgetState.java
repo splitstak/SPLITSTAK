@@ -240,9 +240,9 @@ public class WidgetState {
         enqueue(actionWith("toggle_done", ex.optString("id"), setIdx, 0, null));
 
         // Schedule native local notifications (warning + finish) so the user
-        // gets lock-screen alerts even with the app killed. Web Push doesn't
-        // work reliably under capacitor://localhost, so we don't use the
-        // same worker pipeline the PWA uses here.
+        // gets lock-screen alerts even with the app killed. Native alarms are
+        // simpler and more reliable than the PWA's worker-based push path —
+        // no subscription, no network round-trip, exact timing.
         if (firedTimer) {
             long endsAt = System.currentTimeMillis() + firedDurationSec * 1000L;
             WidgetNotifications.scheduleRestNotifications(ctx, endsAt);

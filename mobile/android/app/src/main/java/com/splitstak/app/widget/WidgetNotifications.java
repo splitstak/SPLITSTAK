@@ -15,11 +15,12 @@ import com.splitstak.app.MainActivity;
 import com.splitstak.app.R;
 
 /**
- * Native local-notification pipeline for the rest timer. Replaces the PWA's
- * Web Push path inside the Capacitor build because PushManager.subscribe()
- * doesn't work reliably under the capacitor://localhost origin. Same UX:
- * a "10 seconds left" warning followed by a "Rest complete" finish, both
- * delivered by the OS regardless of whether the screen is on.
+ * Native local-notification pipeline for the rest timer. Preferred over the
+ * PWA's Web Push path inside the Capacitor build — no subscription juggling,
+ * no worker round-trip, exact-alarm scheduling, and works without network
+ * after the timer is set. Same UX as the web side: a "10 seconds left"
+ * warning followed by a "Rest complete" finish, both delivered by the OS
+ * regardless of whether the screen is on.
  */
 public class WidgetNotifications {
 
