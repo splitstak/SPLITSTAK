@@ -2428,6 +2428,7 @@
       {
         date: '2026-05-13',
         changes: [
+          'New SPLITSTAK Pixel Watch companion app — log sets and adjust weight / reps right from your wrist using the rotating crown, with a watch tile and two watch-face complications for set progress and rest timer. The wear app is bundled inside the Android phone APK, so installing (or updating) SPLITSTAK on your phone auto-pushes the companion to any Wear OS watch paired with it. Open SPLITSTAK on the phone once after install so the watch can pick up your live workout.',
           'Fixed a bug where switching the workout for a weekday could leave both the old and new workout listed in the day picker. Existing duplicates are cleaned up automatically on next load — if any day picks the wrong workout, just re-set it from DATA + SETNG → DAY ASSIGNMENT once.',
           'Fixed a bug where dismissing the rest timer mid-beep could leave Spotify or other background music paused indefinitely. The timer now releases audio focus cleanly on dismiss so music resumes the moment you tap dismiss.',
           'Each exercise has a new NOTES button (just above View History). Tap it to swap the sets pane for a notes text box — jot down form cues, positions, weights to remember, anything. Tap again to hide. Notes save automatically and stay with the exercise.',
@@ -2534,6 +2535,7 @@
       ${isNativeApp ? '' : `<div class="info-section">
         <h3>ANDROID APP</h3>
         <p>The native Android app adds a <strong>lock-screen widget</strong> — tick sets, adjust weight and reps with ± buttons, and watch the rest timer right from your lock screen. Native lock-screen notifications fire for the 10-second warning and finish even when the app is closed.</p>
+        <p>Includes a <strong>Pixel Watch / Wear OS companion</strong> — log sets and adjust weight / reps from your wrist with the rotating crown, plus a watch tile and two complications for set progress and rest timer. If your phone is paired to a Wear OS watch, the companion auto-installs after you install the phone app.</p>
         <p>Each install keeps its own storage. To move your history across: <strong>DATA + SETNG → BACKUP & RESTORE → Export</strong> the CSV here, then Import it inside the Android app after installing.</p>
         <a class="finish-day" href="https://github.com/splitstak/SPLITSTAK/releases/download/v0.1.0-android-beta/splitstak.apk" target="_blank" rel="noopener" style="display: block; text-decoration: none; text-align: center; margin-top: 14px;">DOWNLOAD ANDROID APP</a>
       </div>`}

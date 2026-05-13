@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tile preview shown to users when picking which tiles to add to their
+     carousel. Static dark-on-orange logo placeholder; the live tile pulls
+     real data once installed. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="400dp"
+    android:height="400dp"
+    android:viewportWidth="400"
+    android:viewportHeight="400">
+    <path
+        android:fillColor="@color/ss_bg"
+        android:pathData="M0,0h400v400h-400z" />
+    <path
+        android:fillColor="@color/ss_accent"
+        android:pathData="M120,160h160v60h-160z" />
+    <path
+        android:fillColor="@color/ss_bg"
+        android:pathData="M150,180h100v20h-100z" />
+</vector>

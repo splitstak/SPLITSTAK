@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SPLITSTAK</string>
+    <string name="tile_active_label">SPLITSTAK Workout</string>
+    <string name="tile_active_description">Current exercise + log sets without unlocking your phone.</string>
+    <string name="complication_set_label">SPLITSTAK Set Progress</string>
+    <string name="complication_rest_label">SPLITSTAK Rest Timer</string>
+</resources>

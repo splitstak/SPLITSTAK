@@ -22,6 +22,9 @@ public class WidgetPlugin extends Plugin {
         WidgetState state = new WidgetState(getContext());
         state.saveSnapshot(snapshot);
         SplitstakAppWidgetProvider.refreshAll(getContext());
+        // Fan the same snapshot out to any paired Wear OS device so the
+        // watch app + tiles + complications stay in sync.
+        com.splitstak.app.wear.DataLayerPublisher.publishToWatch(getContext(), snapshot);
         call.resolve();
     }
 
