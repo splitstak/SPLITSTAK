@@ -5,7 +5,7 @@ import android.os.Build
 import android.provider.Settings
 import android.view.Surface
 import android.view.WindowManager
-import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -13,7 +13,6 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,64 +36,56 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.Button
 import androidx.wear.compose.material.ButtonDefaults
 import androidx.wear.compose.material.Text
+import com.splitstak.app.wear.RotaryDispatcher
 import com.splitstak.app.wear.data.ActionSender
 import com.splitstak.app.wear.data.Exercise
 import com.splitstak.app.wear.data.SetEntry
 import com.splitstak.app.wear.data.Snapshot
 import com.splitstak.app.wear.data.WatchState
 import kotlin.math.abs
-import kotlinx.coroutines.delay
 
 /**
  * The main interaction surface — one exercise, one set displayed at a time.
  *
- * Three focusable rectangles, all driven by the same pattern:
- *   1. Tap a rectangle → orange pulsing border (focused).
+ * Three focusable shapes, all driven by the same pattern:
+ *   1. Tap a shape → orange pulsing border (focused).
  *   2. Spin the crown → adjusts the focused field. The crown indicator
  *      arrow pulses on the same side the physical crown is on, in sync
- *      with the focused box's border.
+ *      with the focused box's border (one shared animation clock).
  *   3. Tap again → release focus, crown becomes idle.
  *
- * The three rectangles:
- *   - Exercise dome (top): a half-circle-topped frame whose curve traces
- *     the watch's screen edge. Contains name + target + "SET 2/3".
- *     Crown cycles exercises.
+ * The three shapes:
+ *   - Exercise semicircle (top): the entire upper half of the screen, a
+ *     half-circle whose curve traces the watch's bezel. Contains
+ *     name + target + "SET 2/3". Crown cycles exercises.
  *   - WT / RPS boxes (or mode-equivalent): crown adjusts the value.
  *
- * Touch handling on the inner rectangles uses `pointerInput` rather than
- * `clickable` so they don't steal Compose focus from the outer Box, which
- * is where the rotary input is wired up. A LaunchedEffect re-requests
- * focus on every state change as a belt-and-braces safety net.
+ * Rotary input is read from [RotaryDispatcher] — a SharedFlow fed by
+ * MainActivity.dispatchGenericMotionEvent. This avoids Compose's focus
+ * system, which was unreliable with nested tap targets.
  *
- * The done circle below the boxes is a plain tap toggle — no focus needed
- * because there's nothing to "adjust" on it.
- *
- * On hitting a PR, a full-face black overlay flashes "PR" for ~3s. Every
- * interaction calls [ActionSender], which optimistically mutates the
- * watch's local snapshot for instant feedback and sends the same action
- * to the phone over MessageClient for the source-of-truth update.
+ * On hitting a PR, a full-face black overlay flashes "PR" for ~3s.
+ * Every interaction calls [ActionSender], which optimistically mutates
+ * the watch's local snapshot for instant feedback and sends the same
+ * action to the phone over MessageClient for the source-of-truth update.
  */
 @Composable
 fun ActiveExerciseScreen(snapshot: Snapshot) {
@@ -111,40 +102,50 @@ fun ActiveExerciseScreen(snapshot: Snapshot) {
         if (idx >= 0) idx else (exercise.sets.size - 1).coerceAtLeast(0)
     }
 
-    // Which rectangle is focused for crown input. Intentionally NOT keyed
+    // Which shape is focused for crown input. Intentionally NOT keyed
     // on exercise.id — we want focus to persist while the user spins
     // through exercises with the crown.
     var focused by remember { mutableStateOf<String?>(null) }
 
-    // Compose focus + rotary handling. The outer Box always holds focus so
-    // crown events route to our handler regardless of which UI rectangle
-    // is visually focused-for-editing.
-    val focusRequester = remember { FocusRequester() }
-    var rotaryAccum by remember { mutableStateOf(0f) }
-    // Re-request focus on every focus-state change. Tapping a child
-    // pointerInput zone doesn't move Compose focus, but this guards
-    // against edge cases (initial mount, navigations away & back).
-    LaunchedEffect(focused) {
-        try {
-            delay(50)
-            focusRequester.requestFocus()
-        } catch (_: Exception) {
-        }
-    }
-
     val isLefty = remember { detectLefty(context) }
 
-    // ONE shared pulse for the focused border + crown arrow, so everything
-    // breathes in sync.
+    // ONE shared pulse for the focused border + crown arrow, smooth
+    // ease-in-out so it breathes rather than blinks.
     val pulse = rememberInfiniteTransition(label = "focus-pulse")
     val pulseAlpha by pulse.animateFloat(
-        initialValue = 0.35f, targetValue = 1f,
+        initialValue = 0.45f, targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(700, easing = LinearEasing),
+            animation = tween(1000, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "focus-pulse-alpha"
     )
+
+    // Subscribe to rotary events. The collector is only active while a
+    // shape is focused; otherwise crown rotation is ignored.
+    LaunchedEffect(focused, exercise.id, setIdx) {
+        val f = focused ?: return@LaunchedEffect
+        // Per-mode detent thresholds. Lower for inc-style adjustments
+        // so the crown feels responsive; higher for exercise nav so a
+        // single roll doesn't skip past three exercises.
+        val threshold = if (f == "exercise") 50f else 24f
+        var accum = 0f
+        RotaryDispatcher.events.collect { delta ->
+            accum += delta
+            while (abs(accum) >= threshold) {
+                val sign = if (accum > 0) 1 else -1
+                accum -= sign * threshold
+                when (f) {
+                    "exercise" -> ActionSender.nav(context, sign)
+                    "weight" -> ActionSender.incWeight(context, exercise.id, setIdx, sign)
+                    "reps"   -> ActionSender.incReps(context, exercise.id, setIdx, sign)
+                    "hold"   -> ActionSender.incHold(context, exercise.id, setIdx, sign)
+                    "ctime"  -> ActionSender.incTime(context, exercise.id, sign.toDouble())
+                    "cdist"  -> ActionSender.incDistance(context, exercise.id, sign.toDouble())
+                }
+            }
+        }
+    }
 
     // PR overlay — rising edge of exercise.isPr while id stays constant.
     var showPrOverlay by remember { mutableStateOf(false) }
@@ -152,7 +153,7 @@ fun ActiveExerciseScreen(snapshot: Snapshot) {
     LaunchedEffect(exercise.id, exercise.isPr) {
         if (exercise.isPr && !prevPr.value) {
             showPrOverlay = true
-            delay(3000)
+            kotlinx.coroutines.delay(3000)
             showPrOverlay = false
         }
         prevPr.value = exercise.isPr
@@ -162,38 +163,15 @@ fun ActiveExerciseScreen(snapshot: Snapshot) {
         modifier = Modifier
             .fillMaxSize()
             .background(SplitstakColors.Bg)
-            .focusRequester(focusRequester)
-            .focusable()
-            .onRotaryScrollEvent { event ->
-                val f = focused ?: return@onRotaryScrollEvent false
-                rotaryAccum += event.verticalScrollPixels
-                // One crown detent ≈ 40px of scroll. Exercise nav uses a
-                // larger threshold so the user doesn't blow past multiple
-                // exercises with a single roll.
-                val threshold = if (f == "exercise") 70f else 40f
-                while (abs(rotaryAccum) >= threshold) {
-                    val sign = if (rotaryAccum > 0) 1 else -1
-                    rotaryAccum -= sign * threshold
-                    when (f) {
-                        "exercise" -> ActionSender.nav(context, sign)
-                        "weight" -> ActionSender.incWeight(context, exercise.id, setIdx, sign)
-                        "reps"   -> ActionSender.incReps(context, exercise.id, setIdx, sign)
-                        "hold"   -> ActionSender.incHold(context, exercise.id, setIdx, sign)
-                        "ctime"  -> ActionSender.incTime(context, exercise.id, sign.toDouble())
-                        "cdist"  -> ActionSender.incDistance(context, exercise.id, sign.toDouble())
-                    }
-                }
-                true
-            }
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 10.dp, vertical = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterVertically),
+                .padding(horizontal = 6.dp, vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            ExerciseDome(
+            ExerciseSemicircle(
                 exercise = exercise,
                 setIdx = setIdx,
                 isCardio = isCardio,
@@ -233,7 +211,7 @@ fun ActiveExerciseScreen(snapshot: Snapshot) {
         }
 
         // Crown indicator arrow — pulses on whichever side the crown is
-        // physically on, in sync with the focused box border.
+        // physically on, in sync with the focused border.
         if (focused != null) {
             Box(
                 modifier = Modifier
@@ -274,8 +252,7 @@ fun ActiveExerciseScreen(snapshot: Snapshot) {
 
 /**
  * Worn-on-right-wrist mode rotates the display 180°. Check both the
- * Display's rotation (current rendering) and the user setting (Wear OS
- * persists the lefty choice in USER_ROTATION).
+ * Display's rotation and the user setting fallback.
  */
 private fun detectLefty(context: Context): Boolean {
     val rot = runCatching {
@@ -295,31 +272,24 @@ private fun detectLefty(context: Context): Boolean {
 }
 
 /**
- * Shape with a flat bottom + sides and a domed top whose curve rises
- * `domeRise` pixels above the rectangle. Approximates a circular arc
- * with a quadratic bezier — close enough to feel like it's tracing the
- * watch's screen edge at the dome's apex.
+ * True semicircle shape — flat chord at the bottom, full arc from
+ * bottom-left up over the top to bottom-right. No flat sides. Uses a
+ * quadratic bezier; tune the control point so the apex sits exactly at
+ * the box's top edge.
  */
-private data class DomeShape(val domeRise: Dp) : Shape {
+private object SemicircleShape : Shape {
     override fun createOutline(
         size: Size,
         layoutDirection: LayoutDirection,
         density: Density
     ): Outline {
-        val rise = with(density) { domeRise.toPx() }
-        // Don't let rise exceed the box's height — fall back to a flat top
-        // for unusually-short boxes.
-        val r = minOf(rise, size.height)
+        val w = size.width
+        val h = size.height
+        // Bezier control point at (w/2, -h) yields a peak at (w/2, 0).
+        // Math: B(0.5).y = 0.25·h + 0.5·(-h) + 0.25·h = 0.
         val path = Path().apply {
-            moveTo(0f, size.height)
-            lineTo(0f, r)
-            // Bezier control point at (W/2, -r) puts the curve's apex
-            // exactly at (W/2, 0) — the top edge of the bounding box.
-            quadraticBezierTo(
-                size.width / 2f, -r,
-                size.width, r
-            )
-            lineTo(size.width, size.height)
+            moveTo(0f, h)
+            quadraticBezierTo(w / 2f, -h, w, h)
             close()
         }
         return Outline.Generic(path)
@@ -327,7 +297,7 @@ private data class DomeShape(val domeRise: Dp) : Shape {
 }
 
 @Composable
-private fun ExerciseDome(
+private fun ExerciseSemicircle(
     exercise: Exercise,
     setIdx: Int,
     isCardio: Boolean,
@@ -335,8 +305,6 @@ private fun ExerciseDome(
     pulseAlpha: Float,
     onClick: () -> Unit
 ) {
-    val domeRise = 22.dp
-    val shape = remember { DomeShape(domeRise) }
     val borderColor: Color = if (focused) {
         SplitstakColors.Accent.copy(alpha = pulseAlpha)
     } else {
@@ -351,16 +319,21 @@ private fun ExerciseDome(
         }
     }
 
+    // Width ≈ 92% of screen so the arc clears the bezel. Height fixed
+    // so the bezier produces a visually-balanced semicircle (height
+    // around half the width gives a near-circular look).
     Column(
         modifier = Modifier
-            .fillMaxWidth(0.86f)
-            .background(SplitstakColors.Surface, shape = shape)
-            .border(1.5.dp, borderColor, shape = shape)
+            .fillMaxWidth(0.92f)
+            .height(110.dp)
+            .background(SplitstakColors.Surface, shape = SemicircleShape)
+            .border(1.5.dp, borderColor, shape = SemicircleShape)
             .pointerInput(Unit) { detectTapGestures { onClick() } }
-            // Top padding clears the dome's narrow apex zone so text
-            // sits in the flat-width portion of the shape.
-            .padding(start = 6.dp, end = 6.dp, top = domeRise + 2.dp, bottom = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            // Top padding clears the narrow apex of the arc so text
+            // sits in the wider lower portion of the semicircle.
+            .padding(start = 14.dp, end = 14.dp, top = 38.dp, bottom = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(1.dp)
     ) {
         Text(
             text = exercise.name.uppercase(),

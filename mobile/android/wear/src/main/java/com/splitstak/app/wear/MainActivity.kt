@@ -1,6 +1,9 @@
 package com.splitstak.app.wear
 
 import android.os.Bundle
+import android.view.InputDevice
+import android.view.MotionEvent
+import android.view.ViewConfiguration
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -26,6 +29,11 @@ import com.splitstak.app.wear.ui.SyncingScreen
  * which screen to render — no NavHost needed because every transition
  * is driven by the snapshot (rest started, day complete, etc.) rather
  * than by user navigation.
+ *
+ * Also intercepts rotary-encoder (crown) MotionEvents and republishes
+ * them through [RotaryDispatcher]. Compose's focus-based rotary handling
+ * was unreliable here because nested tap targets kept poaching focus;
+ * routing through the Activity sidesteps that entirely.
  */
 class MainActivity : ComponentActivity() {
 
@@ -43,6 +51,23 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun dispatchGenericMotionEvent(ev: MotionEvent?): Boolean {
+        if (ev != null
+            && ev.action == MotionEvent.ACTION_SCROLL
+            && ev.isFromSource(InputDevice.SOURCE_ROTARY_ENCODER)
+        ) {
+            // Wear OS reports rotary motion on AXIS_SCROLL as floating-point
+            // detent fractions; multiply by the system's scaled scroll
+            // factor to get pixels. Negate so "crown up / away from user"
+            // maps to "value increases" — the natural mental model.
+            val scaledScroll = ev.getAxisValue(MotionEvent.AXIS_SCROLL) *
+                ViewConfiguration.get(this).scaledVerticalScrollFactor
+            RotaryDispatcher.emit(-scaledScroll)
+            return true
+        }
+        return super.dispatchGenericMotionEvent(ev)
     }
 }
 
