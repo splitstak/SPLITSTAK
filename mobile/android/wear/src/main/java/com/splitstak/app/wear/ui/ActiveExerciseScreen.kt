@@ -16,7 +16,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -39,10 +38,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
@@ -60,6 +57,7 @@ import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.Button
 import androidx.wear.compose.material.ButtonDefaults
 import androidx.wear.compose.material.Text
+import com.splitstak.app.wear.Haptic
 import com.splitstak.app.wear.RotaryDispatcher
 import com.splitstak.app.wear.data.ActionSender
 import com.splitstak.app.wear.data.Exercise
@@ -72,28 +70,24 @@ import kotlinx.coroutines.delay
 /**
  * The main interaction surface — one exercise, one set displayed at a time.
  *
- * Layout pins a true semicircle (the top half of a circle inscribed in
- * the box's 2:1 bounding rect) to the top of the screen. Its curvature
- * matches the watch's bezel because both the semicircle and the watch
- * face are circles of the same diameter. The remaining bottom half of
- * the screen holds the value boxes, the done circle, and the progress
- * dots.
+ * Layout: a semicircular "header" near the top of the screen whose arc
+ * traces close to the watch's bezel curvature, then value boxes, done
+ * circle, and progress dots centered in the rest of the screen.
  *
- * Three focusable shapes, all driven by the same pattern:
- *   1. Tap a shape → orange pulsing border (focused).
- *   2. Spin the crown → adjusts the focused field.
- *   3. Tap again → release focus.
+ * Three focusable shapes — exercise semicircle, WT box, RPS box — all
+ * driven by the same pattern: tap to focus (orange pulsing border),
+ * crown to adjust, tap again to release. The crown is RATCHETED:
+ * each detent fires one action + a tick haptic, then locks out further
+ * actions for a short window so a fast spin doesn't blow past three
+ * exercises at once.
  *
- * Rotary input is read from [RotaryDispatcher] (a SharedFlow fed by
- * MainActivity.dispatchGenericMotionEvent) inside ONE persistent
- * LaunchedEffect that uses rememberUpdatedState to read the current
- * focus/exercise/setIdx without re-subscribing on every state change.
+ * Rotary input is read from [RotaryDispatcher] (Activity-level intercept)
+ * inside one persistent LaunchedEffect using rememberUpdatedState — no
+ * re-subscription on focus/state changes.
  *
- * The PR overlay flashes only when a set is newly marked done AND the
- * exercise is currently in PR territory — adjusting weight upward no
- * longer triggers a false PR celebration. Tap the overlay to dismiss.
- * The "PR" pill on the exercise card is a separate, persistent badge
- * that stays visible while the PR condition holds.
+ * The PR overlay flashes only on the rising edge of done-count (a set
+ * just transitioned to done) AND while the exercise is in PR territory.
+ * Tap the overlay to dismiss early.
  */
 @Composable
 fun ActiveExerciseScreen(snapshot: Snapshot) {
@@ -111,13 +105,13 @@ fun ActiveExerciseScreen(snapshot: Snapshot) {
     }
 
     // Focus state — intentionally NOT keyed on exercise.id so it
-    // persists while the user spins through exercises with the crown.
+    // persists while the user crowns through exercises.
     var focused by remember { mutableStateOf<String?>(null) }
 
     val isLefty = remember { detectLefty(context) }
 
-    // Slow, smooth breathing pulse — read as State to defer to
-    // graphicsLayer at draw time and avoid recomposing on every frame.
+    // Slow breathing pulse, read as State and dereferenced inside
+    // graphicsLayer { } so alpha changes redraw without recomposing.
     val pulse = rememberInfiniteTransition(label = "focus-pulse")
     val pulseAlphaState: State<Float> = pulse.animateFloat(
         initialValue = 0.5f, targetValue = 1f,
@@ -128,26 +122,29 @@ fun ActiveExerciseScreen(snapshot: Snapshot) {
         label = "focus-pulse-alpha"
     )
 
-    // ONE persistent rotary collector. rememberUpdatedState lets the
-    // collector read current focus/exercise/setIdx values without
-    // tearing down the collector on every state change.
+    // One persistent rotary collector — RATCHETED so each detent fires
+    // one action then locks out further events for a short window.
     val focusedRef = rememberUpdatedState(focused)
     val exerciseIdRef = rememberUpdatedState(exercise.id)
     val setIdxRef = rememberUpdatedState(setIdx)
     LaunchedEffect(Unit) {
         var accum = 0f
+        var lockedUntilMs = 0L
         RotaryDispatcher.events.collect { delta ->
-            val f = focusedRef.value ?: return@collect
-            val exId = exerciseIdRef.value
-            val sIdx = setIdxRef.value
+            val f = focusedRef.value ?: run { accum = 0f; return@collect }
+            val now = System.currentTimeMillis()
+            if (now < lockedUntilMs) {
+                // In lockout — discard delta so it doesn't build up.
+                accum = 0f
+                return@collect
+            }
             accum += delta
-            // Per-mode detent thresholds. Lower for inc-style adjustments
-            // so the crown feels responsive; higher for exercise nav so
-            // a single roll doesn't skip past three exercises.
-            val threshold = if (f == "exercise") 60f else 32f
-            while (abs(accum) >= threshold) {
+            val threshold = if (f == "exercise") 50f else 28f
+            if (abs(accum) >= threshold) {
                 val sign = if (accum > 0) 1 else -1
-                accum -= sign * threshold
+                accum = 0f
+                val exId = exerciseIdRef.value
+                val sIdx = setIdxRef.value
                 when (f) {
                     "exercise" -> ActionSender.nav(context, sign)
                     "weight" -> ActionSender.incWeight(context, exId, sIdx, sign)
@@ -156,12 +153,16 @@ fun ActiveExerciseScreen(snapshot: Snapshot) {
                     "ctime"  -> ActionSender.incTime(context, exId, sign.toDouble())
                     "cdist"  -> ActionSender.incDistance(context, exId, sign.toDouble())
                 }
+                Haptic.tick(context)
+                // Ratchet lockout: longer for exercise nav (bigger change
+                // per step), shorter for value increments.
+                lockedUntilMs = now + if (f == "exercise") 600L else 400L
             }
         }
     }
 
-    // PR overlay — fires only on the rising edge of done-count
-    // (a set was just newly completed) AND while exercise.isPr is true.
+    // PR overlay — fires only on rising edge of done-count, not on
+    // adjusted-value-into-PR-territory.
     var showPrOverlay by remember { mutableStateOf(false) }
     val doneCount = remember(exercise) {
         exercise.sets.count { it.d } + (if (exercise.cardio?.done == true) 1 else 0)
@@ -185,8 +186,6 @@ fun ActiveExerciseScreen(snapshot: Snapshot) {
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // TOP HALF: semicircle pinned to screen top, exactly tracing
-            // the watch's bezel curvature.
             ExerciseSemicircle(
                 exercise = exercise,
                 setIdx = setIdx,
@@ -198,8 +197,8 @@ fun ActiveExerciseScreen(snapshot: Snapshot) {
                 }
             )
 
-            // BOTTOM HALF: body content centered vertically in remaining
-            // space.
+            // Bottom area — body content centered vertically in
+            // whatever's left below the semicircle.
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -236,8 +235,7 @@ fun ActiveExerciseScreen(snapshot: Snapshot) {
             }
         }
 
-        // Crown indicator arrow — pulses on whichever side the crown is
-        // on, sharing the same pulse clock as the focused border.
+        // Crown indicator arrow — pulses in sync with focused border.
         if (focused != null) {
             Box(
                 modifier = Modifier
@@ -256,7 +254,7 @@ fun ActiveExerciseScreen(snapshot: Snapshot) {
             }
         }
 
-        // PR overlay — tap to dismiss.
+        // PR overlay
         if (showPrOverlay) {
             Box(
                 modifier = Modifier
@@ -281,7 +279,7 @@ fun ActiveExerciseScreen(snapshot: Snapshot) {
 
 /**
  * Worn-on-right-wrist mode rotates the display 180°. Check both the
- * Display's rotation and the user setting fallback.
+ * Display's rotation and USER_ROTATION fallback.
  */
 private fun detectLefty(context: Context): Boolean {
     val rot = runCatching {
@@ -301,11 +299,19 @@ private fun detectLefty(context: Context): Boolean {
 }
 
 /**
- * True semicircle: top half of a circle inscribed in the box's bounding
- * rect. The Box MUST be sized 2:1 (width : height) for the arc to fit
- * exactly — fillMaxWidth() + aspectRatio(2f) does that. The arc's
- * curvature then matches the watch's bezel because both are circles of
- * the same diameter (full screen width).
+ * Arc shape that passes exactly through the bottom-left, top-center,
+ * and bottom-right of the box, with a small inset so the border stroke
+ * doesn't get clipped at the apex.
+ *
+ * Math: given box (w, h) and desired apex y = inset, find circle
+ * center (w/2, cy) and radius r such that the circle passes through
+ * (0, h) AND (w/2, inset). By symmetry the right corner (w, h) is also
+ * on the circle.
+ *
+ *   r = cy - inset                      (distance from center to apex)
+ *   (w/2)² + (h - cy)² = r²             (left corner on circle)
+ *
+ * Solving:  cy = ((w/2)² + h² - inset²) / (2·(h - inset))
  */
 private object SemicircleShape : Shape {
     override fun createOutline(
@@ -315,17 +321,25 @@ private object SemicircleShape : Shape {
     ): Outline {
         val w = size.width
         val h = size.height
-        // Inscribed-circle bounds: square (0,0) to (w,w). Arc from
-        // 180° (left of circle = (0, w/2)) sweeping +180° clockwise
-        // passes through 270° (top = (w/2, 0)) and lands at 360°/0°
-        // (right = (w, w/2)). When h = w/2 the arc's endpoints coincide
-        // exactly with the box's bottom corners.
+        val inset = with(density) { 2.dp.toPx() }
+        val cx = w / 2f
+        val cy = (cx * cx + h * h - inset * inset) / (2f * (h - inset))
+        val r = cy - inset
+
+        // Endpoint angles (Compose convention: 0° = +x, clockwise)
+        val dyEdge = h - cy   // negative because h < cy
+        val startRad = Math.atan2(dyEdge.toDouble(), -cx.toDouble())
+        val endRad = Math.atan2(dyEdge.toDouble(), cx.toDouble())
+        val startDeg = ((Math.toDegrees(startRad).toFloat() % 360f) + 360f) % 360f
+        val endDeg = ((Math.toDegrees(endRad).toFloat() % 360f) + 360f) % 360f
+        val sweepDeg = (endDeg - startDeg + 360f) % 360f
+
         val path = Path().apply {
             moveTo(0f, h)
             arcTo(
-                rect = Rect(0f, 0f, w, w),
-                startAngleDegrees = 180f,
-                sweepAngleDegrees = 180f,
+                rect = Rect(cx - r, cy - r, cx + r, cy + r),
+                startAngleDegrees = startDeg,
+                sweepAngleDegrees = sweepDeg,
                 forceMoveTo = false
             )
             close()
@@ -343,22 +357,21 @@ private fun ExerciseSemicircle(
     pulseAlphaState: State<Float>,
     onClick: () -> Unit
 ) {
+    // Smaller, shorter semicircle. fillMaxWidth(0.9) + aspectRatio(2.6)
+    // gives a wide, shallow arc that occupies roughly the top third of
+    // the screen rather than crowding the full top half.
     Box(
         modifier = Modifier
-            .fillMaxWidth(0.97f)
-            .aspectRatio(2f)
+            .fillMaxWidth(0.9f)
+            .aspectRatio(2.6f)
             .background(SplitstakColors.Surface, shape = SemicircleShape)
             .pointerInput(Unit) { detectTapGestures { onClick() } }
     ) {
-        // Static dark border — always visible.
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .border(1.5.dp, SplitstakColors.Border, shape = SemicircleShape)
         )
-        // Pulsing orange border — only when focused. graphicsLayer
-        // reads pulseAlphaState at draw time, not recomposition time,
-        // so the animation doesn't cause expensive recomposition.
         if (focused) {
             Box(
                 modifier = Modifier
@@ -367,20 +380,18 @@ private fun ExerciseSemicircle(
                     .border(1.5.dp, SplitstakColors.Accent, shape = SemicircleShape)
             )
         }
-        // Content — clear the narrow top portion of the arc with a
-        // top padding so text sits in the wider lower portion.
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(start = 18.dp, end = 18.dp, top = 56.dp, bottom = 8.dp),
+                .padding(start = 14.dp, end = 14.dp, top = 24.dp, bottom = 4.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(2.dp)
+            verticalArrangement = Arrangement.spacedBy(1.dp)
         ) {
             Text(
                 text = exercise.name.uppercase(),
                 fontFamily = FontFamily.SansSerif,
-                fontSize = 12.sp,
-                lineHeight = 14.sp,
+                fontSize = 11.sp,
+                lineHeight = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = SplitstakColors.Text,
                 textAlign = TextAlign.Center,
@@ -391,7 +402,7 @@ private fun ExerciseSemicircle(
                 Text(
                     text = exercise.target,
                     fontFamily = FontFamily.Monospace,
-                    fontSize = 9.sp,
+                    fontSize = 8.sp,
                     color = SplitstakColors.Accent,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -490,13 +501,11 @@ private fun ValueBox(
                 .background(SplitstakColors.Surface)
                 .pointerInput(Unit) { detectTapGestures { onClick() } }
         ) {
-            // Static dark border underlay.
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .border(1.5.dp, SplitstakColors.Border)
             )
-            // Pulsing accent border overlay when focused.
             if (focused) {
                 Box(
                     modifier = Modifier
@@ -505,7 +514,6 @@ private fun ValueBox(
                         .border(1.5.dp, SplitstakColors.Accent)
                 )
             }
-            // Value text — sits on top.
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
