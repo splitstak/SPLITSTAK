@@ -4195,17 +4195,22 @@
     const date = new Date().toISOString().split('T')[0];
     const filename = 'splitstak-' + date + '.csv';
 
-    // Inside the Capacitor WebView, <a download> silently fails — Android's
-    // System WebView has no default download manager attached. Route through
-    // the platform share sheet via the Web Share API so the user can save to
-    // Files, email it, etc. Falls through to the standard browser path when
-    // running on splitstak.com in Chrome.
-    if (window.Capacitor && navigator.canShare) {
-      const file = new File([csv], filename, { type: 'text/csv;charset=utf-8;' });
-      if (navigator.canShare({ files: [file] })) {
+    // DIAG: surface every branch via toast so we can see what the Capacitor
+    // WebView is actually doing on tap. Will be cleaned up once we know.
+    if (window.Capacitor) {
+      showToast('cap: ' + (navigator.canShare ? 'canShare yes' : 'canShare NO'));
+      if (!navigator.canShare) return;
+      try {
+        const file = new File([csv], filename, { type: 'text/csv;charset=utf-8;' });
+        const ok = navigator.canShare({ files: [file] });
+        showToast('canShare(files)=' + ok);
+        if (!ok) return;
         navigator.share({ files: [file], title: filename })
           .then(() => showToast('Exported'))
-          .catch(() => {}); // user cancelled the share sheet — no toast, no error
+          .catch((e) => showToast('share err: ' + (e && (e.message || e.name) || 'unknown')));
+        return;
+      } catch (e) {
+        showToast('try err: ' + (e && (e.message || e.name) || 'unknown'));
         return;
       }
     }
