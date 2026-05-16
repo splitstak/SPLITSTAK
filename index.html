@@ -452,6 +452,48 @@
     background: var(--accent-dim);
   }
 
+  /* Layout-picker footer at the bottom of the autocomplete list — lets
+     users set the row shape (weight+reps / bodyweight / time / cardio)
+     for custom names that don't match the library, or override the
+     inherited mode on any exercise. */
+  .autocomplete-layout-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border-top: 1px solid var(--border);
+    background: var(--surface-2);
+  }
+
+  .autocomplete-layout-row .layout-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--text-faint);
+    letter-spacing: 0.08em;
+    margin-right: 4px;
+    flex-shrink: 0;
+  }
+
+  .autocomplete-layout-row .layout-btn {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 0;
+    padding: 5px 6px;
+    cursor: pointer;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .autocomplete-layout-row .layout-btn:hover,
+  .autocomplete-layout-row .layout-btn.active {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
   .autocomplete-item .target-hint {
     font-family: 'JetBrains Mono', monospace;
     font-size: 10px;
@@ -1781,7 +1823,42 @@
     { name: 'Behind-the-Back Wrist Curl', target: '3 × 12–15', mode: 'reps', tags: ['forearms','grip','barbell'] },
     { name: 'Plate Pinch', target: '3 × 30s ea', mode: 'time', tags: ['grip','forearms','plate','unilateral','hold'] },
     { name: "Farmer's Walk", target: '3 × 30–60s', mode: 'time', tags: ['grip','forearms','core','traps','carry','dumbbell','hold'] },
-    { name: 'Suitcase Carry', target: '3 × 30–45s ea', mode: 'time', tags: ['grip','core','obliques','carry','dumbbell','unilateral','hold'] }
+    { name: 'Suitcase Carry', target: '3 × 30–45s ea', mode: 'time', tags: ['grip','core','obliques','carry','dumbbell','unilateral','hold'] },
+
+    // ===== PLANET FITNESS / SELECTORIZED MACHINES =====
+    // Machines specifically common at Planet Fitness and most commercial
+    // gyms — the selectorized stack variants that aren't covered by the
+    // free-weight/cable entries above. Assisted bodyweight machines are
+    // mode 'reps' (the user logs the assist load they used, not pure
+    // bodyweight) so the entry stays useful for tracking progressive
+    // de-loading of assist over time.
+    { name: 'Machine Chest Press', target: '3 × 8–10', mode: 'reps', tags: ['chest','push','pec','machine','planet fitness'] },
+    { name: 'Incline Machine Chest Press', target: '3 × 8–10', mode: 'reps', tags: ['chest','push','pec','incline','upper chest','machine','planet fitness'] },
+    { name: 'Machine Shoulder Press', target: '3 × 8–10', mode: 'reps', tags: ['shoulders','delts','push','machine','planet fitness'] },
+    { name: 'Machine Back Row', target: '3 × 8–10', mode: 'reps', tags: ['back','lats','pull','machine','planet fitness'] },
+    { name: 'Assisted Pull-Up', target: '3 × 8–12', mode: 'reps', tags: ['back','lats','pull','biceps','machine','assisted','planet fitness'] },
+    { name: 'Assisted Chin-Up', target: '3 × 8–12', mode: 'reps', tags: ['back','lats','biceps','arms','pull','machine','assisted','planet fitness'] },
+    { name: 'Assisted Dip', target: '3 × 8–12', mode: 'reps', tags: ['chest','triceps','tricep','push','machine','assisted','planet fitness'] },
+    { name: 'Machine Preacher Curl', target: '3 × 10–12', mode: 'reps', tags: ['biceps','bicep','arms','machine','preacher','planet fitness'] },
+    { name: 'Machine Tricep Extension', target: '3 × 10–12', mode: 'reps', tags: ['triceps','tricep','arms','machine','planet fitness'] },
+    { name: 'Glute Kickback Machine', target: '3 × 12–15 ea', mode: 'reps', tags: ['glutes','machine','unilateral','planet fitness'] },
+    { name: 'Ab Crunch Machine', target: '3 × 12–20', mode: 'reps', tags: ['abs','core','machine','crunch','planet fitness'] },
+    { name: 'Oblique Twist Machine', target: '3 × 12–20', mode: 'reps', tags: ['abs','obliques','core','rotation','machine','planet fitness'] },
+    { name: 'Smith Machine Romanian Deadlift', target: '3 × 8–10', mode: 'reps', tags: ['hamstrings','glutes','hinge','smith','rdl','planet fitness'] },
+    { name: 'Smith Machine Lunge', target: '3 × 10–12 ea', mode: 'reps', tags: ['quads','glutes','lunge','smith','unilateral','legs','planet fitness'] },
+
+    // ===== CARDIO MACHINES =====
+    // mode 'cardio' triggers the time + distance pair on the exercise row.
+    // Suggested rest is implicitly 0 — cardio sets are continuous, so the
+    // getSuggestedRestSec classifier returns 60s as a safe non-zero
+    // default for any check-in beat between intervals.
+    { name: 'Treadmill', target: '20 min', mode: 'cardio', tags: ['cardio','treadmill','running','walking','machine','planet fitness'] },
+    { name: 'Elliptical', target: '20 min', mode: 'cardio', tags: ['cardio','elliptical','low impact','machine','planet fitness'] },
+    { name: 'StairMaster', target: '20 min', mode: 'cardio', tags: ['cardio','stairs','stair climber','machine','planet fitness'] },
+    { name: 'Arc Trainer', target: '20 min', mode: 'cardio', tags: ['cardio','elliptical','arc','low impact','machine','planet fitness'] },
+    { name: 'Recumbent Bike', target: '20 min', mode: 'cardio', tags: ['cardio','bike','cycling','recumbent','machine','planet fitness'] },
+    { name: 'Upright Bike', target: '20 min', mode: 'cardio', tags: ['cardio','bike','cycling','upright','machine','planet fitness'] },
+    { name: 'Rower', target: '20 min', mode: 'cardio', tags: ['cardio','rowing','rower','full body','machine','planet fitness'] }
   ];
 
   const STORAGE_KEY = 'liftlog_data_v2';
@@ -2022,6 +2099,11 @@
       const data = state.exerciseData[e.id] || {};
       const history = data.history || [];
       const lastEntry = history[history.length - 1];
+      // bestEntry is the all-time top across all history rows. Used for the
+      // TOP value on the parent row and as the "prev best" baseline the
+      // wear app compares against for PR detection. Falls back to lastEntry
+      // when history is empty (so cardio with only a cardio.time still works).
+      const bestEntry = getAllTimeBest(history) || lastEntry;
       if (e.isCardio) {
         const cardio = data.cardio || { time: '', distance: '', done: false };
         return {
@@ -2042,18 +2124,18 @@
         : defaultSetsForMode(e.mode || 'reps');
       const allComplete = sets.length > 0 && sets.every(s => s.d);
       let lastTop = '';
-      if (lastEntry && lastEntry.topWeight !== undefined) {
-        lastTop = lastEntry.topReps
-          ? `${lastEntry.topWeight} × ${lastEntry.topReps}`
-          : `${lastEntry.topWeight} lb`;
+      if (bestEntry && bestEntry.topWeight !== undefined) {
+        lastTop = bestEntry.topReps
+          ? `${bestEntry.topWeight} × ${bestEntry.topReps}`
+          : `${bestEntry.topWeight} lb`;
       }
       // mode determines the widget's set-row layout: 'reps' (default — weight + reps),
       // 'bodyweight' (reps only), 'time' (single seconds field).
       const mode = e.mode || 'reps';
       // Forwarded so the widget can detect a PR locally and flip the badge
-      // glyph to "PR" when the current top beats the previous one.
-      const prevBestWeight = (lastEntry && lastEntry.topWeight !== undefined) ? lastEntry.topWeight : null;
-      const prevBestReps = (lastEntry && lastEntry.topReps !== undefined) ? lastEntry.topReps : 0;
+      // glyph to "PR" when the current top beats the all-time best.
+      const prevBestWeight = (bestEntry && bestEntry.topWeight !== undefined) ? bestEntry.topWeight : null;
+      const prevBestReps = (bestEntry && bestEntry.topReps !== undefined) ? bestEntry.topReps : 0;
       return { id: e.id, name: e.name, target: e.target || '', kind: 'strength', mode, sets, lastTop, allComplete, prevBestWeight, prevBestReps };
     });
 
@@ -2254,6 +2336,49 @@
     return state.exerciseData[exerciseId];
   }
 
+  // Returns the all-time-best top set across an exercise's full history,
+  // shaped like a single history entry ({ topWeight, topReps, topTime }
+  // — fields populated only when relevant). Replaces the older "show the
+  // most recent save's top" UX with "show the best you've ever hit",
+  // which is what the LAST TOP / TOP row is actually trying to convey.
+  function getAllTimeBest(history) {
+    if (!Array.isArray(history) || history.length === 0) return null;
+    let bestWeight = -Infinity;
+    let bestRepsAtWeight = 0;
+    let bestBodyweightReps = 0;
+    let bestTime = 0;
+    let hasWeight = false;
+    let hasBodyweight = false;
+    let hasTime = false;
+    for (const h of history) {
+      if (h.topWeight !== undefined) {
+        hasWeight = true;
+        const hw = h.topWeight;
+        const hr = h.topReps || 0;
+        if (hw > bestWeight || (hw === bestWeight && hr > bestRepsAtWeight)) {
+          bestWeight = hw;
+          bestRepsAtWeight = hr;
+        }
+      } else if (h.topReps !== undefined) {
+        hasBodyweight = true;
+        if (h.topReps > bestBodyweightReps) bestBodyweightReps = h.topReps;
+      }
+      if (h.topTime !== undefined && h.topTime > bestTime) {
+        hasTime = true;
+        bestTime = h.topTime;
+      }
+    }
+    const out = {};
+    if (hasWeight) {
+      out.topWeight = bestWeight;
+      out.topReps = bestRepsAtWeight;
+    } else if (hasBodyweight) {
+      out.topReps = bestBodyweightReps;
+    }
+    if (hasTime) out.topTime = bestTime;
+    return out;
+  }
+
   // ============ TOP TABS ============
   function getDayLabel() {
     if (!state.currentDay) return 'TODAY';
@@ -2430,7 +2555,13 @@
         changes: [
           'The INFO tab now ends with a small footer linking to the Privacy Policy at splitstak.com/privacy.html and a contact email. The policy was already live; it just wasn\'t reachable from inside the app.',
           'The ANDROID APP card on the INFO tab now points at the latest GitHub release automatically instead of being pinned to the very first beta tag. New beta builds reach sideload users without needing the link updated.',
-          'CSV export inside the Android app now saves directly to your phone\'s Downloads folder, like a normal Chrome download. Tap Export and the file appears at Downloads/splitstak-YYYY-MM-DD.csv — open the Files app to see it. The brief share-sheet step from v1.2.4 is gone. The Chrome PWA at splitstak.com keeps its existing direct .csv download behaviour. Note: requires the Android app to be on v1.2.5 or newer (Android 10+).'
+          'CSV export inside the Android app now saves directly to your phone\'s Downloads folder, like a normal Chrome download. Tap Export and the file appears at Downloads/splitstak-YYYY-MM-DD.csv — open the Files app to see it. The brief share-sheet step from v1.2.4 is gone. The Chrome PWA at splitstak.com keeps its existing direct .csv download behaviour. Note: requires the Android app to be on v1.2.5 or newer (Android 10+).',
+          'The TOP value on each exercise row now shows your all-time best, not just the top from your most recent save. Previously called LAST TOP, now just TOP. The wear app\'s PR detection also reads from this same all-time baseline, so a new PR really means a new PR.',
+          'Exercise autocomplete library expanded with Planet Fitness selectorized machines and cardio: Machine Chest Press (incline + flat), Machine Shoulder Press, Machine Back Row, Assisted Pull-Up / Chin-Up / Dip, Machine Preacher Curl, Machine Tricep Extension, Glute Kickback Machine, Ab Crunch Machine, Oblique Twist Machine, Smith Machine RDL and Lunge, plus Treadmill, Elliptical, StairMaster, Arc Trainer, Recumbent / Upright Bike, and Rower.',
+          'The exercise autocomplete dropdown now ends with a LAYOUT row — four small buttons (W+R, BW, TIME, CARDIO) that switch the exercise row shape on demand. Useful for custom-typed exercise names that don\'t come from the library so you can set bodyweight or cardio mode without picking a library item first.',
+          'The autocomplete dropdown no longer accidentally selects a suggestion when you try to scroll past it. Touch-and-drag scrolls cleanly; only a stationary tap commits the choice.',
+          'Wear OS app: the inline PR badge next to "SET 1/3" no longer clips against the watch\'s round bottom edge — content lifted up inside the top semicircle.',
+          'Wear OS app: the crown ratchet for adjusting weight, reps, and exercise navigation is faster — previous 1100/700 ms lockouts felt sluggish, now 650/350 ms.'
         ]
       },
       {
@@ -2961,9 +3092,9 @@
     // ----- CARDIO (time + distance, single pair) -----
     if (mode === 'cardio') {
       const data = getCardioData(ex.id);
-      const lastEntry = data.history[data.history.length - 1];
-      const lastSummary = (lastEntry && lastEntry.topTime !== undefined)
-        ? `${lastEntry.topTime}m`
+      const bestEntry = getAllTimeBest(data.history);
+      const lastSummary = (bestEntry && bestEntry.topTime !== undefined)
+        ? `${bestEntry.topTime}m`
         : '—';
 
       const historyHtml = data.history.length > 0
@@ -2985,7 +3116,7 @@
               <div class="exercise-target" data-edit-target>${escapeHtml(ex.target || 'time')}</div>
             </div>
             <div class="last-weight">
-              <span class="label">Last Top</span>
+              <span class="label">Top</span>
               ${lastSummary}
             </div>
             <div class="completion-badge" aria-label="Cardio complete">
@@ -3018,23 +3149,23 @@
 
     // ----- TIME / BODYWEIGHT / REPS (set-based) -----
     const data = getExerciseData(ex.id);
-    const lastEntry = data.history[data.history.length - 1];
+    const bestEntry = getAllTimeBest(data.history);
     let lastSummary;
     let lastLabel;
     if (mode === 'time') {
-      lastLabel = 'Last Top';
-      lastSummary = (lastEntry && lastEntry.topTime !== undefined)
-        ? `${lastEntry.topTime}s`
+      lastLabel = 'Top';
+      lastSummary = (bestEntry && bestEntry.topTime !== undefined)
+        ? `${bestEntry.topTime}s`
         : '—';
     } else if (mode === 'bodyweight') {
-      lastLabel = 'Last Top';
-      lastSummary = (lastEntry && lastEntry.topReps !== undefined)
-        ? `${lastEntry.topReps} reps`
+      lastLabel = 'Top';
+      lastSummary = (bestEntry && bestEntry.topReps !== undefined)
+        ? `${bestEntry.topReps} reps`
         : '—';
     } else {
-      lastLabel = 'Last Top';
-      lastSummary = (lastEntry && lastEntry.topWeight !== undefined)
-        ? (lastEntry.topReps ? `${lastEntry.topWeight} × ${lastEntry.topReps}` : `${lastEntry.topWeight} lb`)
+      lastLabel = 'Top';
+      lastSummary = (bestEntry && bestEntry.topWeight !== undefined)
+        ? (bestEntry.topReps ? `${bestEntry.topWeight} × ${bestEntry.topReps}` : `${bestEntry.topWeight} lb`)
         : '—';
     }
 
@@ -3548,12 +3679,11 @@
   }
 
   function setupAutocomplete(input, exercise) {
+    // Always open the autocomplete on focus / each keystroke, even when
+    // there are zero matches — the layout-picker footer is useful for
+    // custom names that don't appear in the library.
     const updateSuggestions = () => {
       const matches = searchExerciseLibrary(input.value);
-      if (matches.length === 0) {
-        closeAutocomplete();
-        return;
-      }
       showAutocomplete(matches, input, exercise);
     };
 
@@ -3571,20 +3701,76 @@
     if (!anchor) return;
     const list = document.createElement('div');
     list.className = 'autocomplete-list';
-    list.innerHTML = matches.map(m => `
+    const currentMode = exerciseMode(exercise);
+    const layoutBtn = (mode, label) =>
+      `<button type="button" class="layout-btn${currentMode === mode ? ' active' : ''}" data-layout="${mode}">${label}</button>`;
+    // Layout-picker footer: always present so users can set the row
+    // shape for custom-typed exercise names that don't match the library,
+    // or override the inherited mode on any exercise.
+    const layoutFooter = `
+      <div class="autocomplete-layout-row">
+        <span class="layout-label">LAYOUT</span>
+        ${layoutBtn('reps', 'W+R')}
+        ${layoutBtn('bodyweight', 'BW')}
+        ${layoutBtn('time', 'TIME')}
+        ${layoutBtn('cardio', 'CARDIO')}
+      </div>
+    `;
+    const itemsHtml = matches.map(m => `
       <div class="autocomplete-item" data-name="${escapeHtml(m.name)}" data-target="${escapeHtml(m.target)}" data-mode="${escapeHtml(m.mode || 'reps')}">
         <span>${escapeHtml(m.name)}</span>
         <span class="target-hint">${escapeHtml(m.target)}</span>
       </div>
     `).join('');
+    list.innerHTML = itemsHtml + layoutFooter;
     anchor.appendChild(list);
     activeAutocomplete = list;
 
+    // Layout-picker tap handlers. Switching mode here keeps the typed
+    // name as-is and just re-shapes the row.
+    list.querySelectorAll('.layout-btn').forEach(btn => {
+      btn.addEventListener('pointerdown', (e) => {
+        e.preventDefault(); // keep input focused so blur runs cleanly after we mutate
+        const mode = btn.dataset.layout;
+        if (!mode) return;
+        // Persist the typed name first so it's not lost when we blur.
+        const typedName = input.value.trim();
+        if (typedName) exercise.name = typedName;
+        applyExerciseMode(exercise, mode);
+        input.blur();
+        setTimeout(() => {
+          renderContent();
+          const card = document.querySelector(`.exercise[data-exercise="${exercise.id}"]`);
+          if (card) card.classList.add('expanded');
+        }, 200);
+      });
+    });
+
     list.querySelectorAll('.autocomplete-item').forEach(item => {
-      // pointerdown fires before the input's blur, so we can mutate state before
-      // commit. preventDefault keeps focus on the input until blur() runs below.
+      // Tap-vs-scroll discrimination. pointerdown alone fires the moment a
+      // finger touches the row, which means trying to scroll the suggestion
+      // list past a row was selecting that row. Track the down position,
+      // bail if the pointer moves more than touch-slop (10 px) before
+      // pointerup, and only commit on a clean stationary tap.
+      let startX = 0, startY = 0, isTap = false;
       item.addEventListener('pointerdown', (e) => {
-        e.preventDefault();
+        e.preventDefault(); // keep focus on the input so blur() runs in our handler, not before
+        startX = e.clientX;
+        startY = e.clientY;
+        isTap = true;
+      });
+      item.addEventListener('pointermove', (e) => {
+        if (!isTap) return;
+        if (Math.abs(e.clientX - startX) > 10 || Math.abs(e.clientY - startY) > 10) {
+          isTap = false;
+        }
+      });
+      const cancel = () => { isTap = false; };
+      item.addEventListener('pointercancel', cancel);
+      item.addEventListener('pointerleave', cancel);
+      item.addEventListener('pointerup', () => {
+        if (!isTap) return;
+        isTap = false;
         const newName = item.dataset.name;
         const newTarget = item.dataset.target;
         const newMode = item.dataset.mode || 'reps';

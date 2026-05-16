@@ -154,10 +154,11 @@ fun ActiveExerciseScreen(snapshot: Snapshot) {
                     "cdist"  -> ActionSender.incDistance(context, exId, sign.toDouble())
                 }
                 Haptic.tick(context)
-                // Ratchet lockout: long enough that sustained spinning
-                // produces ~1 fire/sec for values, ~1/sec for exercise
-                // nav, so landing on a specific value is deliberate.
-                lockedUntilMs = now + if (f == "exercise") 1100L else 700L
+                // Ratchet lockout: tuned so sustained spinning produces
+                // ~1.5 fires/sec for exercise nav and ~3 fires/sec for
+                // values. Previous 1100/700 felt sluggish — reduced to
+                // 650/350 in 2026-05 per testing feedback.
+                lockedUntilMs = now + if (f == "exercise") 650L else 350L
             }
         }
     }
@@ -383,7 +384,11 @@ private fun ExerciseSemicircle(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(start = 14.dp, end = 14.dp, top = 32.dp, bottom = 6.dp),
+                // Top trimmed 32→24 and bottom expanded 6→14 so the inline
+                // PR pill in the SET row sits clear of the watch's round
+                // chin — previously the bottom of the badge clipped on the
+                // semicircle's flat chord where the round display curves in.
+                .padding(start = 14.dp, end = 14.dp, top = 24.dp, bottom = 14.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
